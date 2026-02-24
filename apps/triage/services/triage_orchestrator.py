@@ -109,5 +109,4 @@ class TriageOrchestrator:
         session.save()
 
         return session, final_decision, red_flag_result
-    print("SESSION EXISTS AFTER RUN:", TriageSession.objects.filter(patient_token=['patient_token']).exists())
 
