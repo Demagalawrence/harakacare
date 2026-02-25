@@ -12,8 +12,8 @@ def simulate_triage_intake():
     print("📥 Simulating Triage Agent Intake...")
     
     triage_data = {
-        "patient_token": "patient_abc123def456",
-        "triage_session_id": "session_789xyz",
+        "patient_token": "DEMO_PATIENT_TOKEN_001",
+        "triage_session_id": "DEMO_SESSION_001",
         "risk_level": "high",
         "primary_symptom": "chest_pain",
         "secondary_symptoms": ["difficulty_breathing", "dizziness"],
@@ -187,7 +187,7 @@ def simulate_notification(routing_result):
         "notification_id": f"notif_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
         "timestamp": datetime.now().isoformat(),
         "case": {
-            "patient_token": "patient_abc123def456",
+            "patient_token": "DEMO_PATIENT_TOKEN_001",
             "risk_level": "high",
             "primary_symptom": "chest_pain",
             "urgency": "emergency"
@@ -239,8 +239,8 @@ def simulate_followup_notification(routing_result, facility_response):
     print("\n📱 Simulating Follow-up Agent Notification...")
     
     followup_data = {
-        "patient_token": "patient_abc123def456",
-        "routing_id": "routing_123",
+        "patient_token": "DEMO_PATIENT_TOKEN_001",
+        "routing_id": "DEMO_ROUTING_001",
         "assigned_facility": routing_result["recommended_facility"]["name"],
         "booking_status": "confirmed",
         "facility_response": facility_response,
