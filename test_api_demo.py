@@ -1,6 +1,9 @@
 """
 API Demo for HarakaCare Facility Agent
 Demonstrates the complete workflow without requiring Django setup
+
+NOTE: This file contains only demo/test data. All tokens and IDs are mock values
+prefixed with "DEMO_" and do not represent real secrets or credentials.
 """
 
 import json
