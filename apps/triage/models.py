@@ -1,15 +1,22 @@
 """
-Triage Models
+Triage Models - UPDATED FOR COMPLAINT-BASED, AGE-ADAPTIVE TRIAGE
 Models for AI-powered medical triage assessment
-Based on: HarakaCare Triage Agent Data Requirements
+Based on: WHO/ICRC triage principles + HarakaCare requirements
+
+MAJOR CHANGES:
+- Replaced "primary symptom" with "complaint group"
+- Added mandatory age_group (7 categories) and sex fields
+- Added complaint_text for AI classification
+- Added symptom_indicators (JSONField) for structured answers
+- Added progression_status for symptom trajectory
+- Added risk_modifiers for high-risk populations
+- Continuous red_flag_indicators throughout conversation
+- Removed vital signs (users can't measure these)
 """
 
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django.core.validators import MinValueValidator, MaxValueValidator
-from django.db import models
-
-
 import uuid
 
 from apps.core.models import BaseModel, StatusModel
@@ -17,8 +24,8 @@ from apps.core.models import BaseModel, StatusModel
 
 class TriageSession(StatusModel):
     """
-    Main triage session model
-    Stores anonymous patient triage data
+    Main triage session model - REDESIGNED
+    Implements WHO/ICRC-aligned, age-adaptive triage
     """
 
     class RiskLevel(models.TextChoices):
@@ -38,7 +45,10 @@ class TriageSession(StatusModel):
         ESCALATED = 'escalated', _('Escalated')
         CANCELLED = 'cancelled', _('Cancelled')
 
-    # Anonymous Patient Token (system-generated, no PII)
+    # ========================================================================
+    # ANONYMOUS PATIENT TOKEN
+    # ========================================================================
+    
     patient_token = models.CharField(
         _('patient token'),
         max_length=64,
@@ -47,7 +57,6 @@ class TriageSession(StatusModel):
         help_text=_('Anonymous identifier for this patient session')
     )
 
-    # Session metadata
     session_status = models.CharField(
         _('session status'),
         max_length=20,
@@ -55,19 +64,55 @@ class TriageSession(StatusModel):
         default=SessionStatus.STARTED
     )
 
-    # Demographic Context (3.2)
-    age_range = models.CharField(
-        _('age range'),
+    # ========================================================================
+    # NEW: COMPLAINT-BASED INTAKE (replaces "primary symptom")
+    # ========================================================================
+    
+    complaint_text = models.TextField(
+        _('complaint text'),
+        help_text=_('Original user message: "Tell me what is happening"'),
+        blank=True
+    )
+
+    complaint_group = models.CharField(
+        _('complaint group'),
+        max_length=50,
+        choices=[
+            ('fever', _('Fever / feeling hot')),
+            ('breathing', _('Breathing or cough problem')),
+            ('injury', _('Injury or accident')),
+            ('abdominal', _('Abdominal pain / vomiting / diarrhea')),
+            ('headache', _('Headache / confusion / weakness')),
+            ('chest_pain', _('Chest pain')),
+            ('pregnancy', _('Pregnancy concern')),
+            ('skin', _('Skin problem')),
+            ('feeding', _('Feeding problem / general weakness')),
+            ('bleeding', _('Bleeding / blood loss')),
+            ('mental_health', _('Mental health / emotional crisis')),
+            ('other', _('Other')),
+        ],
+        null=True,
+        blank=True,
+        help_text=_('AI-classified complaint group (NOT a diagnosis)')
+    )
+
+    # ========================================================================
+    # MANDATORY DEMOGRAPHIC CONTEXT (captured EARLY)
+    # ========================================================================
+    
+    age_group = models.CharField(
+        _('age group'),
         max_length=20,
         choices=[
-            ('under_5', _('Under 5')),
-            ('5_12', _('5-12')),
-            ('13_17', _('13-17')),
-            ('18_30', _('18-30')),
-            ('31_50', _('31-50')),
-            ('51_plus', _('51+')),
+            ('newborn', _('Newborn (0-2 months)')),
+            ('infant', _('Infant (2-12 months)')),
+            ('child_1_5', _('Child (1-5 years)')),
+            ('child_6_12', _('Child (6-12 years)')),
+            ('teen', _('Teen (13-17 years)')),
+            ('adult', _('Adult (18-64 years)')),
+            ('elderly', _('Elderly (65+ years)')),
         ],
-        help_text=_('Patient age range')
+        help_text=_('Age group - determines question tree and risk modifiers')
     )
 
     sex = models.CharField(
@@ -76,13 +121,162 @@ class TriageSession(StatusModel):
         choices=[
             ('male', _('Male')),
             ('female', _('Female')),
-            ('prefer_not_to_say', _('Prefer not to say')),
+            ('other', _('Other / Prefer not to say')),
+        ],
+        help_text=_('Biological sex - required for pregnancy screening')
+    )
+
+    # Person for whom triage is being done
+    patient_relation = models.CharField(
+        _('patient relation'),
+        max_length=20,
+        choices=[
+            ('self', _('For myself')),
+            ('child', _('For my child')),
+            ('family', _('For family member')),
+            ('other', _('For someone else')),
+        ],
+        default='self',
+        help_text=_('Who is the patient?')
+    )
+
+    # ========================================================================
+    # STRUCTURED SYMPTOM INDICATORS (from adaptive questions)
+    # ========================================================================
+    
+    symptom_indicators = models.JSONField(
+        _('symptom indicators'),
+        default=dict,
+        blank=True,
+        help_text=_(
+            'Structured answers from adaptive questions, e.g., '
+            '{"breathing_difficulty": true, "chest_indrawing": false, '
+            '"can_drink": true, "rash_present": false}'
+        )
+    )
+
+    # Observable severity (NOT clinical measurements)
+    symptom_severity = models.CharField(
+        _('symptom severity'),
+        max_length=20,
+        choices=[
+            ('mild', _('Mild - can do normal activities')),
+            ('moderate', _('Moderate - some difficulty with activities')),
+            ('severe', _('Severe - unable to do normal activities')),
+            ('very_severe', _('Very severe - unable to move/talk/function')),
         ],
         null=True,
         blank=True
     )
 
-    # Location Data (3.3) - Coarse location only
+    symptom_duration = models.CharField(
+        _('symptom duration'),
+        max_length=20,
+        choices=[
+            ('less_than_1_hour', _('Less than 1 hour')),
+            ('1_6_hours', _('1-6 hours')),
+            ('6_24_hours', _('6-24 hours')),
+            ('1_3_days', _('1-3 days')),
+            ('4_7_days', _('4-7 days')),
+            ('more_than_1_week', _('More than 1 week')),
+            ('more_than_1_month', _('More than 1 month')),
+        ],
+        null=True,
+        blank=True
+    )
+
+    # NEW: Symptom progression (replaces "pattern")
+    progression_status = models.CharField(
+        _('progression status'),
+        max_length=20,
+        choices=[
+            ('sudden', _('Sudden onset')),
+            ('getting_worse', _('Getting worse')),
+            ('staying_same', _('Staying the same')),
+            ('getting_better', _('Getting better')),
+            ('comes_and_goes', _('Comes and goes')),
+        ],
+        null=True,
+        blank=True,
+        help_text=_('Observable symptom trajectory')
+    )
+
+    # ========================================================================
+    # CONTINUOUS RED FLAG INDICATORS (WHO ABCD)
+    # ========================================================================
+    
+    red_flag_indicators = models.JSONField(
+        _('red flag indicators'),
+        default=dict,
+        blank=True,
+        help_text=_(
+            'WHO ABCD danger signs detected at any point: '
+            '{"airway_obstruction": false, "severe_breathing": true, '
+            '"heavy_bleeding": false, "unconscious": false, '
+            '"convulsions": false, "confusion": false}'
+        )
+    )
+
+    has_red_flags = models.BooleanField(
+        _('has red flags'),
+        default=False,
+        help_text=_('Whether ANY emergency red flags were detected')
+    )
+
+    red_flag_detected_at_turn = models.IntegerField(
+        _('red flag detected at turn'),
+        null=True,
+        blank=True,
+        help_text=_('Conversation turn number when first red flag detected')
+    )
+
+    # ========================================================================
+    # HIGH-RISK MODIFIERS
+    # ========================================================================
+    
+    risk_modifiers = models.JSONField(
+        _('risk modifiers'),
+        default=dict,
+        blank=True,
+        help_text=_(
+            'High-risk population flags: '
+            '{"is_pregnant": false, "has_chronic_asthma": true, '
+            '"is_newborn": false, "is_immunocompromised": false}'
+        )
+    )
+
+    # Pregnancy status (for females 13-50)
+    pregnancy_status = models.CharField(
+        _('pregnancy status'),
+        max_length=30,
+        choices=[
+            ('yes', _('Yes, confirmed pregnant')),
+            ('possible', _('Possibly pregnant')),
+            ('no', _('No')),
+            ('not_applicable', _('Not applicable')),
+        ],
+        null=True,
+        blank=True
+    )
+
+    # Chronic conditions (simplified - yes/no, details in risk_modifiers)
+    has_chronic_conditions = models.BooleanField(
+        _('has chronic conditions'),
+        default=False,
+        help_text=_('Patient has any chronic illness (details in risk_modifiers)')
+    )
+
+    # Current medication
+    on_medication = models.BooleanField(
+        _('on medication'),
+        default=False,
+        help_text=_('Patient is currently taking any medication')
+    )
+
+    # ========================================================================
+    # LOCATION DATA (captured near END)
+    # ========================================================================
+    
     district = models.CharField(
         _('district'),
         max_length=100,
@@ -95,6 +289,14 @@ class TriageSession(StatusModel):
         null=True,
         blank=True,
         help_text=_('Sub-county or division')
+    )
+
+    village = models.CharField(
+        _('village'),
+        max_length=100,
+        null=True,
+        blank=True,
+        help_text=_('Village or LC1')
     )
 
     device_location_lat = models.FloatField(
@@ -117,160 +319,51 @@ class TriageSession(StatusModel):
         help_text=_('Whether patient consented to share device location')
     )
 
-    # Primary Symptom (3.4) - Single choice, required
+    # ========================================================================
+    # DEPRECATED FIELDS (keep for migration compatibility)
+    # ========================================================================
+    
+    # DEPRECATED: Replaced by complaint_group
     primary_symptom = models.CharField(
-        _('primary symptom'),
+        _('primary symptom (DEPRECATED)'),
         max_length=50,
-        choices=[
-            ('fever', _('Fever')),
-            ('headache', _('Headache')),
-            ('chest_pain', _('Chest pain')),
-            ('difficulty_breathing', _('Difficulty breathing')),
-            ('abdominal_pain', _('Abdominal pain')),
-            ('vomiting', _('Vomiting')),
-            ('diarrhea', _('Diarrhea')),
-            ('injury_trauma', _('Injury / trauma')),
-            ('skin_problem', _('Skin problem')),
-            ('other', _('Other')),
-        ]
-    )
-
-    # Secondary Symptoms (3.5) - Multiple choice (stored as array)
-    secondary_symptoms =  models.JSONField(
-        models.CharField(max_length=50),
-        blank=True,
-        default=list,
-        help_text=_('Secondary symptoms (multiple choice)')
-    )
-
-    # Symptom Severity (3.6) - Required
-    symptom_severity = models.CharField(
-        _('symptom severity'),
-        max_length=20,
-        choices=[
-            ('mild', _('Mild')),
-            ('moderate', _('Moderate')),
-            ('severe', _('Severe')),
-            ('very_severe', _('Very severe')),
-        ]
-    )
-
-    # Symptom Duration (3.7) - Required
-    symptom_duration = models.CharField(
-        _('symptom duration'),
-        max_length=20,
-        choices=[
-            ('today', _('Today')),
-            ('1_3_days', _('1-3 days')),
-            ('4_7_days', _('4-7 days')),
-            ('more_than_1_week', _('More than 1 week')),
-            ('more_than_1_month', _('More than 1 month')),
-        ]
-    )
-
-    # Symptom Pattern (3.8) - Optional
-    symptom_pattern = models.CharField(
-        _('symptom pattern'),
-        max_length=20,
-        choices=[
-            ('getting_better', _('Getting better')),
-            ('staying_same', _('Staying the same')),
-            ('getting_worse', _('Getting worse')),
-            ('comes_and_goes', _('Comes and goes')),
-        ],
         null=True,
-        blank=True
-    )
-
-    # Emergency Red Flags (3.9) - Stored as array of detected flags
-    red_flags =  models.JSONField(
-        models.CharField(max_length=50),
         blank=True,
+        help_text=_('DEPRECATED: Use complaint_group instead')
+    )
+
+    # DEPRECATED: Replaced by symptom_indicators
+    secondary_symptoms = models.JSONField(
         default=list,
-        help_text=_('Emergency red-flag symptoms detected')
-    )
-
-    has_red_flags = models.BooleanField(
-        _('has red flags'),
-        default=False,
-        help_text=_('Whether any emergency red flags were detected')
-    )
-
-    # Previous Condition (3.10) - Required
-    condition_occurrence = models.CharField(
-        _('condition occurrence'),
-        max_length=30,
-        choices=[
-            ('first_occurrence', _('First occurrence')),
-            ('happened_before', _('Happened before')),
-            ('long_term', _('Long-term / continuous condition')),
-        ]
-    )
-
-    # Chronic Conditions (3.11) - Multiple choice
-    chronic_conditions =  models.JSONField(
-        models.CharField(max_length=50),
         blank=True,
+        help_text=_('DEPRECATED: Use symptom_indicators instead')
+    )
+
+    # DEPRECATED: Replaced by red_flag_indicators
+    red_flags = models.JSONField(
         default=list,
-        help_text=_('Pre-existing chronic conditions')
-    )
-
-    # Current Medication (3.12)
-    current_medication = models.CharField(
-        _('current medication'),
-        max_length=20,
-        choices=[
-            ('yes', _('Yes')),
-            ('no', _('No')),
-            ('not_sure', _('Not sure')),
-        ],
-        null=True,
-        blank=True
-    )
-
-    # Allergies (3.13)
-    has_allergies = models.CharField(
-        _('has allergies'),
-        max_length=20,
-        choices=[
-            ('yes', _('Yes')),
-            ('no', _('No')),
-            ('not_sure', _('Not sure')),
-        ],
-        null=True,
-        blank=True
-    )
-
-    allergy_types =  models.JSONField(
-        models.CharField(max_length=30),
         blank=True,
+        help_text=_('DEPRECATED: Use red_flag_indicators instead')
+    )
+
+    # DEPRECATED: Too broad
+    chronic_conditions = models.JSONField(
         default=list,
-        help_text=_('Types of allergies: medication, food, environmental')
+        blank=True,
+        help_text=_('DEPRECATED: Use risk_modifiers instead')
     )
 
-    # Pregnancy Status (3.14) - Conditional
-    pregnancy_status = models.CharField(
-        _('pregnancy status'),
-        max_length=30,
-        choices=[
-            ('yes', _('Yes')),
-            ('no', _('No')),
-            ('not_applicable', _('Not applicable')),
-            ('prefer_not_to_say', _('Prefer not to say')),
-        ],
-        null=True,
-        blank=True
-    )
-
-    # Additional Description (3.15) - Optional
+    # DEPRECATED: Users can't provide this
     additional_description = models.TextField(
-        _('additional description'),
-        max_length=500,
+        _('additional description (DEPRECATED)'),
         blank=True,
-        help_text=_('Short free-text description (character-limited)')
+        help_text=_('DEPRECATED: Use complaint_text instead')
     )
 
-    # Consent (3.16) - Required
+    # ========================================================================
+    # CONSENT (REQUIRED)
+    # ========================================================================
+    
     consent_medical_triage = models.BooleanField(
         _('consent for medical triage'),
         default=False
@@ -288,14 +381,17 @@ class TriageSession(StatusModel):
         help_text=_('Consent for follow-up if required')
     )
 
-    # AI Assessment Results
+    # ========================================================================
+    # AI ASSESSMENT RESULTS
+    # ========================================================================
+    
     risk_level = models.CharField(
         _('risk level'),
         max_length=20,
         choices=RiskLevel.choices,
         null=True,
         blank=True,
-        help_text=_('AI-assessed risk level')
+        help_text=_('Final risk level (after all adjustments)')
     )
 
     risk_confidence = models.FloatField(
@@ -314,7 +410,6 @@ class TriageSession(StatusModel):
         blank=True
     )
 
-    # Assessment metadata
     ai_model_version = models.CharField(
         _('AI model version'),
         max_length=50,
@@ -329,7 +424,10 @@ class TriageSession(StatusModel):
         blank=True
     )
 
-    # Agent communication tracking
+    # ========================================================================
+    # AGENT COMMUNICATION
+    # ========================================================================
+    
     forwarded_to_followup = models.BooleanField(
         _('forwarded to follow-up agent'),
         default=False
@@ -340,7 +438,10 @@ class TriageSession(StatusModel):
         default=False
     )
 
-    # Channel information
+    # ========================================================================
+    # CHANNEL & METADATA
+    # ========================================================================
+    
     channel = models.CharField(
         _('channel'),
         max_length=20,
@@ -354,6 +455,12 @@ class TriageSession(StatusModel):
         default='ussd'
     )
 
+    conversation_turns = models.IntegerField(
+        _('conversation turns'),
+        default=0,
+        help_text=_('Number of conversation turns to complete triage')
+    )
+
     class Meta:
         verbose_name = _('triage session')
         verbose_name_plural = _('triage sessions')
@@ -364,10 +471,12 @@ class TriageSession(StatusModel):
             models.Index(fields=['district', 'subcounty']),
             models.Index(fields=['has_red_flags']),
             models.Index(fields=['session_status']),
+            models.Index(fields=['age_group', 'complaint_group']),  # NEW
+            models.Index(fields=['complaint_group', 'risk_level']),  # NEW
         ]
 
     def __str__(self):
-        return f"Triage {self.patient_token[:8]} - {self.risk_level or 'Pending'}"
+        return f"Triage {self.patient_token[:8]} - {self.complaint_group or 'No complaint'} - {self.risk_level or 'Pending'}"
 
     @property
     def is_emergency(self):
@@ -378,31 +487,57 @@ class TriageSession(StatusModel):
     def needs_immediate_attention(self):
         """Check if case needs immediate attention"""
         return (
-                self.has_red_flags or
-                self.risk_level == self.RiskLevel.HIGH or
-                self.symptom_severity == 'very_severe'
+            self.has_red_flags or
+            self.risk_level == self.RiskLevel.HIGH or
+            self.symptom_severity == 'very_severe'
+        )
+
+    @property
+    def is_high_risk_population(self):
+        """Check if patient is in high-risk population"""
+        high_risk_ages = ['newborn', 'infant', 'child_1_5', 'elderly']
+        is_pregnant = self.pregnancy_status in ['yes', 'possible']
+        
+        return (
+            self.age_group in high_risk_ages or
+            is_pregnant or
+            self.has_chronic_conditions
         )
 
     def generate_symptom_summary(self):
         """Generate a text summary of symptoms"""
-        summary_parts = [f"Primary: {self.get_primary_symptom_display()}"]
-
-        if self.secondary_symptoms:
-            summary_parts.append(f"Secondary: {', '.join(self.secondary_symptoms)}")
-
-        summary_parts.append(f"Severity: {self.get_symptom_severity_display()}")
-        summary_parts.append(f"Duration: {self.get_symptom_duration_display()}")
+        summary_parts = []
+        
+        if self.complaint_group:
+            summary_parts.append(f"Complaint: {self.get_complaint_group_display()}")
+        
+        if self.age_group:
+            summary_parts.append(f"Age: {self.get_age_group_display()}")
+        
+        if self.symptom_severity:
+            summary_parts.append(f"Severity: {self.get_symptom_severity_display()}")
+        
+        if self.symptom_duration:
+            summary_parts.append(f"Duration: {self.get_symptom_duration_display()}")
+        
+        if self.progression_status:
+            summary_parts.append(f"Progress: {self.get_progression_status_display()}")
 
         if self.has_red_flags:
-            summary_parts.append(f"⚠️ RED FLAGS: {', '.join(self.red_flags)}")
+            red_flag_names = [k.replace('_', ' ').title() for k, v in self.red_flag_indicators.items() if v]
+            summary_parts.append(f"⚠️ RED FLAGS: {', '.join(red_flag_names)}")
 
         return " | ".join(summary_parts)
 
 
+# ============================================================================
+# SYMPTOM ASSESSMENT - DEPRECATED (replaced by adaptive questioning)
+# ============================================================================
+
 class SymptomAssessment(BaseModel):
     """
-    Detailed symptom assessment with clinical context
-    Tool 2: Symptom Assessment Tool output
+    DEPRECATED: Replaced by adaptive question engine
+    Kept for migration compatibility only
     """
 
     triage_session = models.OneToOneField(
@@ -412,56 +547,52 @@ class SymptomAssessment(BaseModel):
         verbose_name=_('triage session')
     )
 
-    # Structured symptom analysis
     symptom_complexity_score = models.FloatField(
         _('symptom complexity score'),
         validators=[MinValueValidator(0.0), MaxValueValidator(10.0)],
-        help_text=_('Calculated complexity score based on symptoms')
+        default=0.0
     )
 
     symptom_cluster = models.CharField(
         _('symptom cluster'),
         max_length=100,
-        blank=True,
-        help_text=_('Identified symptom cluster (e.g., respiratory, gastrointestinal)')
+        blank=True
     )
 
-    # Clinical reasoning
-    differential_conditions =  models.JSONField(
-        models.CharField(max_length=100),
-        blank=True,
+    differential_conditions = models.JSONField(
         default=list,
-        help_text=_('Possible conditions based on symptoms (for reference only)')
+        blank=True
     )
 
-    # Assessment notes (generated by tool)
     assessment_notes = models.TextField(
         _('assessment notes'),
-        blank=True,
-        help_text=_('AI-generated clinical assessment notes')
+        blank=True
     )
 
-    # Symptom severity indicators
     pain_scale = models.IntegerField(
         _('pain scale'),
         null=True,
         blank=True,
-        validators=[MinValueValidator(0), MaxValueValidator(10)],
-        help_text=_('Pain intensity 0-10')
+        validators=[MinValueValidator(0), MaxValueValidator(10)]
     )
 
     class Meta:
-        verbose_name = _('symptom assessment')
-        verbose_name_plural = _('symptom assessments')
+        verbose_name = _('symptom assessment (DEPRECATED)')
+        verbose_name_plural = _('symptom assessments (DEPRECATED)')
 
     def __str__(self):
-        return f"Assessment for {self.triage_session.patient_token[:8]}"
+        return f"DEPRECATED Assessment for {self.triage_session.patient_token[:8]}"
 
+
+# ============================================================================
+# RED FLAG DETECTION - UPDATED FOR CONTINUOUS MONITORING
+# ============================================================================
 
 class RedFlagDetection(BaseModel):
     """
-    Emergency red-flag detection results
-    Tool 3: Red-Flag Detection Tool output
+    Emergency red-flag detection results - UPDATED
+    Implements WHO ABCD (Airway, Breathing, Circulation, Disability)
+    Continuous monitoring throughout conversation
     """
 
     triage_session = models.OneToOneField(
@@ -471,37 +602,140 @@ class RedFlagDetection(BaseModel):
         verbose_name=_('triage session')
     )
 
-    # Individual red flag checks
-    difficulty_breathing = models.BooleanField(_('difficulty breathing'), default=False)
-    chest_pain = models.BooleanField(_('chest pain'), default=False)
-    loss_of_consciousness = models.BooleanField(_('loss of consciousness'), default=False)
-    convulsions = models.BooleanField(_('convulsions/seizures'), default=False)
-    severe_bleeding = models.BooleanField(_('severe bleeding'), default=False)
-    confusion = models.BooleanField(_('confusion or inability to talk'), default=False)
-    high_fever_unresponsive = models.BooleanField(_('high fever not responding'), default=False)
+    # ========================================================================
+    # WHO ABCD DANGER SIGNS
+    # ========================================================================
+    
+    # AIRWAY
+    airway_obstruction = models.BooleanField(
+        _('airway obstruction'),
+        default=False,
+        help_text=_('Choking, stridor, cannot speak')
+    )
 
-    # Detection metadata
+    # BREATHING
+    severe_breathing_difficulty = models.BooleanField(
+        _('severe breathing difficulty'),
+        default=False,
+        help_text=_('Struggling to breathe, very fast breathing, blue lips')
+    )
+    
+    chest_indrawing = models.BooleanField(
+        _('chest indrawing (children)'),
+        default=False,
+        help_text=_('Visible chest pulling in with breathing')
+    )
+
+    # CIRCULATION
+    severe_bleeding = models.BooleanField(
+        _('severe bleeding'),
+        default=False,
+        help_text=_('Heavy bleeding, blood loss')
+    )
+    
+    signs_of_shock = models.BooleanField(
+        _('signs of shock'),
+        default=False,
+        help_text=_('Very pale/weak, collapse, cold extremities')
+    )
+
+    # DISABILITY (neurological)
+    unconscious = models.BooleanField(
+        _('unconscious / unresponsive'),
+        default=False,
+        help_text=_('Not responding, cannot be woken')
+    )
+    
+    convulsions = models.BooleanField(
+        _('convulsions/seizures'),
+        default=False,
+        help_text=_('Fitting, convulsing now or recently')
+    )
+    
+    confusion = models.BooleanField(
+        _('confusion / disorientation'),
+        default=False,
+        help_text=_('Cannot recognize people, confused speech')
+    )
+    
+    stroke_symptoms = models.BooleanField(
+        _('stroke symptoms'),
+        default=False,
+        help_text=_('Face droop, arm weakness, speech difficulty, sudden onset')
+    )
+
+    # ========================================================================
+    # AGE-SPECIFIC DANGER SIGNS (WHO IMCI)
+    # ========================================================================
+    
+    # For infants/children
+    unable_to_drink = models.BooleanField(
+        _('unable to drink/feed (child)'),
+        default=False,
+        help_text=_('Cannot drink or breastfeed')
+    )
+    
+    vomits_everything = models.BooleanField(
+        _('vomits everything (child)'),
+        default=False,
+        help_text=_('Vomits everything given')
+    )
+    
+    lethargic_floppy = models.BooleanField(
+        _('lethargic/floppy (infant)'),
+        default=False,
+        help_text=_('Baby unusually sleepy, floppy, difficult to wake')
+    )
+
+    # ========================================================================
+    # OTHER CRITICAL CONDITIONS
+    # ========================================================================
+    
+    severe_pain = models.BooleanField(
+        _('severe uncontrolled pain'),
+        default=False,
+        help_text=_('Worst pain ever experienced, unbearable')
+    )
+    
+    pregnancy_emergency = models.BooleanField(
+        _('pregnancy emergency'),
+        default=False,
+        help_text=_('Heavy vaginal bleeding, severe abdominal pain in pregnancy')
+    )
+
+    # ========================================================================
+    # DETECTION METADATA
+    # ========================================================================
+    
     emergency_override = models.BooleanField(
         _('emergency override'),
         default=False,
-        help_text=_('Whether red flags override AI assessment')
+        help_text=_('Red flags override AI assessment')
     )
 
     detection_method = models.CharField(
         _('detection method'),
         max_length=50,
         choices=[
-            ('user_input', _('User Input')),
+            ('user_keywords', _('User Keywords')),
             ('ai_detected', _('AI Detected')),
-            ('rule_based', _('Rule-based')),
+            ('adaptive_question', _('Adaptive Question Response')),
+            ('continuous_monitoring', _('Continuous Monitoring')),
         ],
-        default='user_input'
+        default='user_keywords'
     )
 
     detected_flags_count = models.IntegerField(
         _('detected flags count'),
         default=0,
         help_text=_('Number of red flags detected')
+    )
+
+    detection_turn_number = models.IntegerField(
+        _('detection turn number'),
+        null=True,
+        blank=True,
+        help_text=_('Conversation turn when flags were detected')
     )
 
     class Meta:
@@ -514,22 +748,51 @@ class RedFlagDetection(BaseModel):
     def count_red_flags(self):
         """Count total red flags detected"""
         flags = [
-            self.difficulty_breathing,
-            self.chest_pain,
-            self.loss_of_consciousness,
-            self.convulsions,
+            self.airway_obstruction,
+            self.severe_breathing_difficulty,
+            self.chest_indrawing,
             self.severe_bleeding,
+            self.signs_of_shock,
+            self.unconscious,
+            self.convulsions,
             self.confusion,
-            self.high_fever_unresponsive,
+            self.stroke_symptoms,
+            self.unable_to_drink,
+            self.vomits_everything,
+            self.lethargic_floppy,
+            self.severe_pain,
+            self.pregnancy_emergency,
         ]
         self.detected_flags_count = sum(flags)
         return self.detected_flags_count
+    
+    def get_detected_flag_names(self):
+        """Get list of detected flag names"""
+        flag_fields = [
+            'airway_obstruction', 'severe_breathing_difficulty', 'chest_indrawing',
+            'severe_bleeding', 'signs_of_shock', 'unconscious', 'convulsions',
+            'confusion', 'stroke_symptoms', 'unable_to_drink', 'vomits_everything',
+            'lethargic_floppy', 'severe_pain', 'pregnancy_emergency'
+        ]
+        
+        detected = []
+        for field in flag_fields:
+            if getattr(self, field, False):
+                # Convert field name to readable format
+                readable = field.replace('_', ' ').title()
+                detected.append(readable)
+        
+        return detected
 
+
+# ============================================================================
+# RISK CLASSIFICATION - UPDATED FOR COMPLAINT-BASED LOGIC
+# ============================================================================
 
 class RiskClassification(BaseModel):
     """
-    AI-powered risk classification results
-    Tool 4: Risk Classification Tool output
+    AI-powered risk classification - UPDATED
+    Now considers: complaint group, age, red flags, symptom indicators
     """
 
     triage_session = models.OneToOneField(
@@ -579,20 +842,20 @@ class RiskClassification(BaseModel):
         help_text=_('Time taken for inference in milliseconds')
     )
 
-    # Feature importance
+    # Feature importance (now includes complaint_group, age_group)
     feature_importance = models.JSONField(
         _('feature importance'),
         null=True,
         blank=True,
-        help_text=_('Which features contributed most to classification')
+        help_text=_('Features that contributed to classification including complaint_group, age_group')
     )
 
-    # Input embeddings metadata
-    symptom_embedding = models.JSONField(
-        _('symptom embedding'),
+    # Input embeddings
+    complaint_embedding = models.JSONField(
+        _('complaint embedding'),
         null=True,
         blank=True,
-        help_text=_('Symptom text embeddings (for analysis)')
+        help_text=_('Complaint text embeddings (for analysis)')
     )
 
     class Meta:
@@ -603,10 +866,14 @@ class RiskClassification(BaseModel):
         return f"Risk: {self.ai_risk_level} ({self.confidence_score:.2f}) - {self.triage_session.patient_token[:8]}"
 
 
+# ============================================================================
+# CLINICAL CONTEXT - UPDATED FOR AGE & RISK MODIFIERS
+# ============================================================================
+
 class ClinicalContext(BaseModel):
     """
-    Clinical context adjustments to risk
-    Tool 5: Clinical Context Tool output
+    Clinical context adjustments - UPDATED
+    Now includes age-specific and population-based modifiers
     """
 
     triage_session = models.OneToOneField(
@@ -616,29 +883,39 @@ class ClinicalContext(BaseModel):
         verbose_name=_('triage session')
     )
 
-    # Risk adjustment factors
-    chronic_condition_modifier = models.FloatField(
-        _('chronic condition modifier'),
+    # Age-based modifiers
+    age_modifier = models.FloatField(
+        _('age modifier'),
         default=0.0,
-        help_text=_('Risk adjustment for chronic conditions (-1.0 to +1.0)')
+        help_text=_(
+            'Risk adjustment for age: '
+            'newborn/infant +0.2, elderly +0.15, child_1_5 +0.1'
+        )
     )
 
+    # Population-based modifiers
     pregnancy_modifier = models.FloatField(
         _('pregnancy modifier'),
         default=0.0,
         help_text=_('Risk adjustment for pregnancy')
     )
 
-    age_modifier = models.FloatField(
-        _('age modifier'),
+    chronic_condition_modifier = models.FloatField(
+        _('chronic condition modifier'),
         default=0.0,
-        help_text=_('Risk adjustment for age (young/elderly)')
+        help_text=_('Risk adjustment for chronic conditions')
     )
 
-    medication_allergy_modifier = models.FloatField(
-        _('medication/allergy modifier'),
+    immunocompromised_modifier = models.FloatField(
+        _('immunocompromised modifier'),
         default=0.0,
-        help_text=_('Risk adjustment for medication and allergies')
+        help_text=_('Risk adjustment for immunocompromised status')
+    )
+
+    medication_modifier = models.FloatField(
+        _('medication modifier'),
+        default=0.0,
+        help_text=_('Risk adjustment for current medications')
     )
 
     # Total adjustment
@@ -663,6 +940,12 @@ class ClinicalContext(BaseModel):
         help_text=_('Risk level after clinical context adjustments')
     )
 
+    conservative_bias_applied = models.BooleanField(
+        _('conservative bias applied'),
+        default=False,
+        help_text=_('Whether conservative bias was applied (never downgrade)')
+    )
+
     class Meta:
         verbose_name = _('clinical context')
         verbose_name_plural = _('clinical contexts')
@@ -671,10 +954,14 @@ class ClinicalContext(BaseModel):
         return f"Context for {self.triage_session.patient_token[:8]} - Adjustment: {self.total_risk_adjustment:+.2f}"
 
 
+# ============================================================================
+# TRIAGE DECISION - UNCHANGED (still the final synthesis)
+# ============================================================================
+
 class TriageDecision(BaseModel):
     """
     Final triage decision synthesis
-    Tool 6: Decision Synthesis Tool output
+    Combines: red flags + AI risk + clinical context + complaint group
     """
 
     triage_session = models.OneToOneField(
@@ -684,7 +971,6 @@ class TriageDecision(BaseModel):
         verbose_name=_('triage session')
     )
 
-    # Final decision
     final_risk_level = models.CharField(
         _('final risk level'),
         max_length=20,
@@ -699,20 +985,19 @@ class TriageDecision(BaseModel):
         help_text=_('Priority for follow-up')
     )
 
-    # Decision logic
     decision_basis = models.CharField(
         _('decision basis'),
         max_length=50,
         choices=[
-            ('ai_primary', _('AI Primary')),
             ('red_flag_override', _('Red Flag Override')),
+            ('age_risk_modifier', _('Age/Risk Modifier')),
+            ('ai_primary', _('AI Primary')),
             ('clinical_adjustment', _('Clinical Adjustment')),
             ('conservative_bias', _('Conservative Bias')),
         ],
         help_text=_('Primary basis for final decision')
     )
 
-    # Recommendations
     recommended_action = models.TextField(
         _('recommended action'),
         help_text=_('Recommended next steps for patient')
@@ -722,17 +1007,16 @@ class TriageDecision(BaseModel):
         _('facility type recommendation'),
         max_length=50,
         choices=[
-            ('emergency', _('Emergency Department')),
-            ('hospital', _('Hospital')),
-            ('health_center', _('Health Center')),
-            ('clinic', _('Clinic')),
+            ('emergency', _('Emergency Department - IMMEDIATE')),
+            ('hospital', _('Hospital - Urgent')),
+            ('health_center', _('Health Center - Soon')),
+            ('clinic', _('Clinic - Routine')),
             ('self_care', _('Self-care with monitoring')),
         ],
         null=True,
         blank=True
     )
 
-    # Decision metadata
     decision_timestamp = models.DateTimeField(
         _('decision timestamp'),
         auto_now_add=True
@@ -740,12 +1024,10 @@ class TriageDecision(BaseModel):
 
     decision_reasoning = models.TextField(
         _('decision reasoning'),
-        help_text=_('Detailed explanation of how decision was reached')
+        help_text=_('Detailed explanation of how decision was reached (audit trail)')
     )
 
-    # Disclaimers shown
-    disclaimers =  models.JSONField(
-        models.TextField(),
+    disclaimers = models.JSONField(
         default=list,
         help_text=_('Disclaimers shown to patient')
     )
@@ -757,6 +1039,10 @@ class TriageDecision(BaseModel):
     def __str__(self):
         return f"Decision: {self.final_risk_level} - {self.triage_session.patient_token[:8]}"
 
+
+# ============================================================================
+# AGENT COMMUNICATION - UNCHANGED
+# ============================================================================
 
 class AgentCommunicationLog(BaseModel):
     """
@@ -771,7 +1057,6 @@ class AgentCommunicationLog(BaseModel):
         verbose_name=_('triage session')
     )
 
-    # Target agent
     target_agent = models.CharField(
         _('target agent'),
         max_length=50,
@@ -782,13 +1067,11 @@ class AgentCommunicationLog(BaseModel):
         ]
     )
 
-    # Payload sent
     payload = models.JSONField(
         _('payload'),
         help_text=_('JSON payload sent to target agent')
     )
 
-    # Communication status
     communication_status = models.CharField(
         _('status'),
         max_length=20,
@@ -801,7 +1084,6 @@ class AgentCommunicationLog(BaseModel):
         default='pending'
     )
 
-    # Response
     response_data = models.JSONField(
         _('response data'),
         null=True,
@@ -809,7 +1091,6 @@ class AgentCommunicationLog(BaseModel):
         help_text=_('Response received from target agent')
     )
 
-    # Timing
     sent_at = models.DateTimeField(
         _('sent at'),
         null=True,
@@ -822,7 +1103,6 @@ class AgentCommunicationLog(BaseModel):
         blank=True
     )
 
-    # Error tracking
     error_message = models.TextField(
         _('error message'),
         blank=True,

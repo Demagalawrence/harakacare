@@ -9,7 +9,7 @@ from .base import *
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0']
+ALLOWED_HOSTS = ['*']
 
 # Development-specific apps
 INSTALLED_APPS += [
@@ -110,5 +110,14 @@ HARAKACARE.update({
     'TRIAGE_SESSION_TIMEOUT': 600,  # 10 minutes for easier testing
     'USE_GPU': False,  # CPU-only for development
 })
+# Africa's Talking Settings
+AT_USERNAME = os.getenv('AT_USERNAME', 'sandbox')
+AT_API_KEY = os.getenv('AT_API_KEY', 'your_api_key_here')
 
-print("🚀 Running in DEVELOPMENT mode")
+# Cache settings for USSD sessions
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'unique-snowflake',
+    }
+}

@@ -37,7 +37,7 @@ SECRET_KEY = 'django-insecure-1n@#*!gtrob)l_%9lg6c-l5=!ix)wu5r807@_)zut(o1gttpxt
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["*"]
 
 
 # Application definition
@@ -60,6 +60,8 @@ INSTALLED_APPS = [
     'apps.analytics',
     'apps.core',
     'apps.conversations',
+    'apps.messaging',
+
 ]
 
 MIDDLEWARE = [
@@ -199,4 +201,15 @@ else:
         'USE_GPU': False,
     }
 
+    
+#    # 360dialog credentials — get these from your 360dialog dashboard
+    THREESIXTY_DIALOG_API_KEY       = "JVN3QAQ02OOC5HDN20891OL63SWL82RW"
+#    THREESIXTY_DIALOG_BASE_URL      = "https://waba.360dialog.io"       # production
+    THREESIXTY_DIALOG_BASE_URL    = "https://waba-sandbox.360dialog.io"  # sandbox
+
 print("🚀 Running in DEVELOPMENT mode")
+
+# curl -X POST https://waba-sandbox.360dialog.io/v1/configs/webhook ^
+# -H "Content-Type: application/json" ^
+# -H "D360-API-KEY: JVN3QAQ02OOC5HDN20891OL63SWL82RW" ^
+# -d "{\"url\":\"https://redemptional-trinomially-barry.ngrok-free.dev/messaging/whatsapp/webhook/\"}"
