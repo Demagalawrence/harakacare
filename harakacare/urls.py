@@ -14,9 +14,26 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
+# harakacare/urls.py
+
 from django.contrib import admin
-from django.urls import path
+from django.urls import path, include
+from django.conf import settings
+
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('api/facilities/', include('apps.facilities.urls')),
+    path('api/v1/triage/', include('apps.triage.urls')),  # ADD THIS LINE
+    path('messaging/', include('apps.messaging.urls')),  # Add this line    
+    path("messaging/whatsapp/", include("apps.messaging.whatsapp.urls")),
+
 ]
+
+
+# Add debug toolbar URLs in development
+if settings.DEBUG:
+    import debug_toolbar
+    urlpatterns = [
+        path('__debug__/', include(debug_toolbar.urls)),
+    ] + urlpatterns

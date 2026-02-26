@@ -11,6 +11,18 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
+import os
+from pathlib import Path
+import environ
+
+# Build paths inside the project
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Initialize environ
+env = environ.Env()
+
+# Read .env file (create one if needed)
+env.read_env(os.path.join(BASE_DIR, '.env'))
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -25,7 +37,7 @@ SECRET_KEY = 'django-insecure-1n@#*!gtrob)l_%9lg6c-l5=!ix)wu5r807@_)zut(o1gttpxt
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["*"]
 
 
 # Application definition
@@ -47,6 +59,9 @@ INSTALLED_APPS = [
     'apps.adherence',
     'apps.analytics',
     'apps.core',
+    'apps.conversations',
+    'apps.messaging',
+
 ]
 
 MIDDLEWARE = [
@@ -130,3 +145,66 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.BasicAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticatedOrReadOnly',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '100/hour',
+        'user': '1000/hour'
+    }
+}
+
+# In base.py, add this:
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'simple': {
+            'format': '{levelname} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'simple',
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': 'INFO',
+        },
+        'apps': {
+            'handlers': ['console'],
+            'level': 'INFO',
+        },
+    },
+}
+
+# HarakaCare Development Overrides
+if 'HARAKACARE' in globals():
+    HARAKACARE.update({
+        'TRIAGE_SESSION_TIMEOUT': 600,  # 10 minutes for easier testing
+        'USE_GPU': False,  # CPU-only for development
+    })
+else:
+    HARAKACARE = {
+        'TRIAGE_SESSION_TIMEOUT': 600,
+        'USE_GPU': False,
+    }
+
+    
+#    # 360dialog credentials — get these from your 360dialog dashboard
+    THREESIXTY_DIALOG_API_KEY       = env('THREESIXTY_DIALOG_API_KEY', default='your-360dialog-api-key')
+#    THREESIXTY_DIALOG_BASE_URL      = "https://waba.360dialog.io"       # production
+    THREESIXTY_DIALOG_BASE_URL    = "https://waba-sandbox.360dialog.io"  # sandbox
+
+print("🚀 Running in DEVELOPMENT mode")
