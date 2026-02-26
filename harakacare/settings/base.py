@@ -203,13 +203,8 @@ else:
 
     
 #    # 360dialog credentials — get these from your 360dialog dashboard
-    THREESIXTY_DIALOG_API_KEY       = "JVN3QAQ02OOC5HDN20891OL63SWL82RW"
+    THREESIXTY_DIALOG_API_KEY       = env('THREESIXTY_DIALOG_API_KEY', default='your-360dialog-api-key')
 #    THREESIXTY_DIALOG_BASE_URL      = "https://waba.360dialog.io"       # production
     THREESIXTY_DIALOG_BASE_URL    = "https://waba-sandbox.360dialog.io"  # sandbox
 
 print("🚀 Running in DEVELOPMENT mode")
-
-# curl -X POST https://waba-sandbox.360dialog.io/v1/configs/webhook ^
-# -H "Content-Type: application/json" ^
-# -H "D360-API-KEY: JVN3QAQ02OOC5HDN20891OL63SWL82RW" ^
-# -d "{\"url\":\"https://redemptional-trinomially-barry.ngrok-free.dev/messaging/whatsapp/webhook/\"}"
