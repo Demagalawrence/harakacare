@@ -340,7 +340,8 @@ class LoggingMonitoringTool:
         """Calculate emergency response rate"""
         emergency_routings = FacilityRouting.objects.filter(
             triage_received_at__gte=start_date,
-            triage_received_at__lte=end_date,
+            triage_received_at__lte=end_date
+        ).filter(
             Q(risk_level='high') | Q(has_red_flags=True)
         )
         
