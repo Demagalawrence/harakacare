@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { facilityAPI } from '../services/api';
 import { 
   Building2, 
   Users, 
@@ -30,6 +31,26 @@ const FacilityDashboard = () => {
     confirmed: 0
   });
 
+  // Fetch data on component mount
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const [casesData, statsData] = await Promise.all([
+          facilityAPI.getCases(),
+          facilityAPI.getStats()
+        ]);
+        setCases(casesData.results || casesData || []);
+        setStats(statsData);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
 
   useEffect(() => {
     let filtered = cases;
@@ -60,21 +81,29 @@ const FacilityDashboard = () => {
     setFilteredCases(filtered);
   }, [filter, searchTerm, cases]);
 
-  const handleCaseAction = (caseId, action) => {
-    setCases(prev => prev.map(c => {
-      if (c.id === caseId) {
-        if (action === 'confirm') {
-          return { ...c, status: 'confirmed', confirmedAt: new Date().toISOString() };
-        }
-        if (action === 'reject') {
-          return { ...c, status: 'rejected' };
-        }
-        if (action === 'acknowledge') {
-          return { ...c, acknowledged: true };
-        }
+  const handleCaseAction = async (caseId, action) => {
+    try {
+      let response;
+      if (action === 'confirm') {
+        response = await facilityAPI.confirmCase(caseId, {
+          confirmedAt: new Date().toISOString()
+        });
+      } else if (action === 'reject') {
+        response = await facilityAPI.rejectCase(caseId, 'Case rejected by facility');
+      } else if (action === 'acknowledge') {
+        response = await facilityAPI.acknowledgeCase(caseId);
       }
-      return c;
-    }));
+
+      // Update local state with API response
+      setCases(prev => prev.map(c => {
+        if (c.id === caseId) {
+          return { ...c, ...response };
+        }
+        return c;
+      }));
+    } catch (error) {
+      console.error('Error performing case action:', error);
+    }
   };
 
   const getRiskBadgeClass = (riskLevel) => {
@@ -215,7 +244,7 @@ const FacilityDashboard = () => {
         <div className="p-6 border-b border-gray-200">
           <h2 className="text-lg font-semibold text-gray-900">Incoming Cases</h2>
           <p className="text-sm text-gray-600 mt-1">
-            Showing {filteredCases.length} of {cases.length} cases
+            Showing {filteredCases?.length || 0} of {cases?.length || 0} cases
           </p>
         </div>
 
@@ -262,7 +291,7 @@ const FacilityDashboard = () => {
                         </div>
                         <div className="text-sm text-gray-500">
                           {caseItem.primarySymptom}
-                          {caseItem.secondarySymptoms.length > 0 && (
+                          {caseItem.secondarySymptoms && caseItem.secondarySymptoms.length > 0 && (
                             <span> +{caseItem.secondarySymptoms.length}</span>
                           )}
                         </div>
@@ -283,7 +312,7 @@ const FacilityDashboard = () => {
                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadgeClass(caseItem.status)}`}>
                       {caseItem.status.replace('_', ' ').toUpperCase()}
                     </span>
-                    {caseItem.redFlagSymptoms.length > 0 && (
+                    {caseItem.redFlagSymptoms && caseItem.redFlagSymptoms.length > 0 && (
                       <div className="flex items-center mt-1 text-xs text-danger-600">
                         <AlertCircle className="w-3 h-3 mr-1" />
                         Red flags
@@ -342,7 +371,7 @@ const FacilityDashboard = () => {
           </table>
         </div>
 
-        {filteredCases.length === 0 && (
+        {filteredCases && filteredCases.length === 0 && (
           <div className="text-center py-12">
             <Users className="w-12 h-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">No cases found</h3>
@@ -411,7 +440,7 @@ const FacilityDashboard = () => {
                     <span className="text-gray-600">Primary:</span>
                     <span className="ml-2 font-medium">{selectedCase.primarySymptom}</span>
                   </div>
-                  {selectedCase.secondarySymptoms.length > 0 && (
+                  {selectedCase.secondarySymptoms && selectedCase.secondarySymptoms.length > 0 && (
                     <div>
                       <span className="text-gray-600">Secondary:</span>
                       <span className="ml-2 font-medium">{selectedCase.secondarySymptoms.join(', ')}</span>
@@ -419,17 +448,17 @@ const FacilityDashboard = () => {
                   )}
                   <div>
                     <span className="text-gray-600">Severity:</span>
-                    <span className="ml-2 font-medium capitalize">{selectedCase.severity.replace('_', ' ')}</span>
+                    <span className="ml-2 font-medium capitalize">{selectedCase.severity ? selectedCase.severity.replace('_', ' ') : 'N/A'}</span>
                   </div>
                   <div>
                     <span className="text-gray-600">Duration:</span>
-                    <span className="ml-2 font-medium">{selectedCase.duration.replace(/_/g, ' ')}</span>
+                    <span className="ml-2 font-medium">{selectedCase.duration ? selectedCase.duration.replace(/_/g, ' ') : 'N/A'}</span>
                   </div>
                 </div>
               </div>
 
               {/* Red Flag Symptoms */}
-              {selectedCase.redFlagSymptoms.length > 0 && (
+              {selectedCase.redFlagSymptoms && selectedCase.redFlagSymptoms.length > 0 && (
                 <div className="bg-danger-50 border border-danger-200 p-4 rounded-lg">
                   <h4 className="font-semibold text-danger-800 mb-2 flex items-center">
                     <AlertCircle className="w-4 h-4 mr-2" />

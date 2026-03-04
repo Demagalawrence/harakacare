@@ -12,4 +12,10 @@ app_name = 'facilities'
 urlpatterns = [
     # API URLs using ViewSet router
     path('api/', include(router.urls)),
+    # Direct endpoints for cases and stats
+    path('cases/', views.get_cases),
+    path('cases/<str:case_id>/confirm/', views.confirm_case),
+    path('cases/<str:case_id>/reject/', views.reject_case),
+    path('cases/<str:case_id>/acknowledge/', views.acknowledge_case),
+    path('stats/', views.get_stats),
 ]

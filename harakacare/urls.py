@@ -25,8 +25,8 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/facilities/', include('apps.facilities.urls')),
     path('api/v1/triage/', include('apps.triage.urls')),  # ADD THIS LINE
-    path('messaging/', include('apps.messaging.urls')),  # Add this line    
-    path("messaging/whatsapp/", include("apps.messaging.whatsapp.urls")),
+    # path('messaging/', include('apps.messaging.urls')),  # Add this line    
+    # path("messaging/whatsapp/", include("apps.messaging.whatsapp.urls")),
 
 ]
 
