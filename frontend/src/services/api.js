@@ -1,45 +1,28 @@
 import axios from 'axios';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://127.0.0.1:8000/api';
+// const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://127.0.0.1:8001/api';
+
+const API_BASE_URL = process.env.REACT_APP_API_URL || '/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
+  withCredentials: true,
 });
 
-// Request interceptor to add auth token
-api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('authToken');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
-
-// Response interceptor to handle errors
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('authToken');
-      window.location.href = '/login';
-    }
-    return Promise.reject(error);
-  }
-);
+// NOTE: Facility dashboard uses session-based auth via withCredentials.
 
 // Patient/Triage API endpoints
 export const patientAPI = {
   // Submit patient triage data
   submitTriage: async (patientData) => {
-    const response = await api.post('/triage/', patientData);
+    // Generate patient token if not provided
+    const patientToken = patientData.patientToken || `PT-${Date.now().toString(36).substr(-6).toUpperCase()}`;
+    
+    // Use correct endpoint with patient token in URL
+    const response = await api.post(`/v1/triage/${patientToken}/submit/`, patientData);
     return response.data;
   },
 
@@ -52,6 +35,24 @@ export const patientAPI = {
   // Get patient history
   getPatientHistory: async (patientToken) => {
     const response = await api.get(`/patients/${patientToken}/history/`);
+    return response.data;
+  },
+};
+
+// Facility dashboard auth endpoints (session-based)
+export const facilityAuthAPI = {
+  login: async (credentials) => {
+    const response = await api.post('/facilities/auth/login/', credentials);
+    return response.data;
+  },
+
+  logout: async () => {
+    const response = await api.post('/facilities/auth/logout/');
+    return response.data;
+  },
+
+  whoami: async () => {
+    const response = await api.get('/facilities/auth/whoami/');
     return response.data;
   },
 };
@@ -85,6 +86,12 @@ export const facilityAPI = {
   // Acknowledge auto-assigned case
   acknowledgeCase: async (caseId) => {
     const response = await api.post(`/facilities/cases/${caseId}/acknowledge/`);
+    return response.data;
+  },
+
+  // Delete a case
+  deleteCase: async (caseId) => {
+    const response = await api.delete(`/facilities/cases/${caseId}/delete/`);
     return response.data;
   },
 

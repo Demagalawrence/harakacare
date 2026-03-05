@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { facilityAPI, facilityAuthAPI } from '../services/api';
 import { 
   Building2, 
   Users, 
@@ -11,7 +12,8 @@ import {
   UserCheck,
   Calendar,
   Activity,
-  X
+  X,
+  Trash2
 } from 'lucide-react';
 
 const FacilityDashboard = () => {
@@ -21,6 +23,10 @@ const FacilityDashboard = () => {
   const [filter, setFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [facility, setFacility] = useState(null);
+  const [loginForm, setLoginForm] = useState({ username: '', password: '' });
+  const [loginError, setLoginError] = useState('');
   const [stats, setStats] = useState({
     total: 0,
     high: 0,
@@ -30,8 +36,54 @@ const FacilityDashboard = () => {
     confirmed: 0
   });
 
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        setAuthLoading(true);
+        const res = await facilityAuthAPI.whoami();
+        setFacility(res.facility);
+      } catch (error) {
+        console.error('Auth check failed:', error);
+        setFacility(null);
+      } finally {
+        setAuthLoading(false);
+      }
+    };
+
+    checkAuth();
+  }, []); // Empty dependency array - run once on mount
+
+  // Fetch data after auth
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const [casesData, statsData] = await Promise.all([
+          facilityAPI.getCases(),
+          facilityAPI.getStats()
+        ]);
+        console.log('Fetched cases data:', casesData);
+        console.log('Fetched stats data:', statsData);
+        setCases(casesData || []);
+        setStats(statsData);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (facility) {
+      fetchData();
+    } else {
+      setCases([]);
+      setFilteredCases([]);
+      setLoading(false);
+    }
+  }, [facility]); // Add facility dependency
 
   useEffect(() => {
+    console.log('Facility state changed:', facility);
     let filtered = cases;
 
     // Apply filter
@@ -52,6 +104,7 @@ const FacilityDashboard = () => {
       filtered = filtered.filter(c => 
         c.patientToken.toLowerCase().includes(searchTerm.toLowerCase()) ||
         c.primarySymptom.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        c.village?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         c.district.toLowerCase().includes(searchTerm.toLowerCase()) ||
         c.facility.toLowerCase().includes(searchTerm.toLowerCase())
       );
@@ -60,21 +113,42 @@ const FacilityDashboard = () => {
     setFilteredCases(filtered);
   }, [filter, searchTerm, cases]);
 
-  const handleCaseAction = (caseId, action) => {
-    setCases(prev => prev.map(c => {
-      if (c.id === caseId) {
-        if (action === 'confirm') {
-          return { ...c, status: 'confirmed', confirmedAt: new Date().toISOString() };
-        }
-        if (action === 'reject') {
-          return { ...c, status: 'rejected' };
-        }
-        if (action === 'acknowledge') {
-          return { ...c, acknowledged: true };
-        }
+  const handleCaseAction = async (caseId, action) => {
+    try {
+      let response;
+      if (action === 'confirm') {
+        response = await facilityAPI.confirmCase(caseId, {
+          confirmedAt: new Date().toISOString()
+        });
+      } else if (action === 'reject') {
+        response = await facilityAPI.rejectCase(caseId, 'Case rejected by facility');
+      } else if (action === 'acknowledge') {
+        response = await facilityAPI.acknowledgeCase(caseId);
       }
-      return c;
-    }));
+
+      // Update local state with API response
+      setCases(prev => prev.map(c => {
+        if (c.id === caseId) {
+          return { ...c, ...response };
+        }
+        return c;
+      }));
+    } catch (error) {
+      console.error('Error performing case action:', error);
+    }
+  };
+
+  const handleDeleteCase = async (caseId) => {
+    if (window.confirm('Are you sure you want to delete this case? This action cannot be undone.')) {
+      try {
+        await facilityAPI.deleteCase(caseId);
+        // Remove case from local state
+        setCases(cases.filter(c => c.id !== caseId));
+        setFilteredCases(filteredCases.filter(c => c.id !== caseId));
+      } catch (error) {
+        console.error('Error deleting case:', error);
+      }
+    }
   };
 
   const getRiskBadgeClass = (riskLevel) => {
@@ -106,6 +180,84 @@ const FacilityDashboard = () => {
     });
   };
 
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setLoginError('');
+    try {
+      const res = await facilityAuthAPI.login(loginForm);
+      setFacility(res.facility);
+    } catch (error) {
+      setLoginError(error.response?.data?.error || 'Login failed');
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await facilityAuthAPI.logout();
+    } catch (error) {
+      // ignore
+    } finally {
+      setFacility(null);
+      setLoginForm({ username: '', password: '' });
+    }
+  };
+
+  if (authLoading) {
+    return (
+      <div className="max-w-7xl mx-auto">
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!facility) {
+    return (
+      <div className="max-w-xl mx-auto">
+        <div className="card p-6">
+          <h1 className="text-2xl font-bold text-gray-900 flex items-center">
+            <Building2 className="w-7 h-7 mr-3 text-primary-600" />
+            Facility Login
+          </h1>
+          <p className="text-gray-600 mt-1">Sign in to view your assigned patient cases.</p>
+
+          <form className="mt-6 space-y-4" onSubmit={handleLogin}>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
+              <input
+                className="input-field w-full"
+                value={loginForm.username}
+                onChange={(e) => setLoginForm({ ...loginForm, username: e.target.value })}
+                autoComplete="username"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+              <input
+                type="password"
+                className="input-field w-full"
+                value={loginForm.password}
+                onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
+                autoComplete="current-password"
+              />
+            </div>
+
+            {loginError && (
+              <div className="bg-danger-50 border border-danger-200 text-danger-700 p-3 rounded text-sm">
+                {loginError}
+              </div>
+            )}
+
+            <button type="submit" className="btn btn-primary w-full">
+              Sign In
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="max-w-7xl mx-auto">
@@ -125,11 +277,14 @@ const FacilityDashboard = () => {
             <Building2 className="w-8 h-8 mr-3 text-primary-600" />
             Facility Dashboard
           </h1>
-          <p className="text-gray-600 mt-1">Monitor and manage patient triage cases</p>
+          <p className="text-gray-600 mt-1">Signed in as: <span className="font-medium">{facility.name}</span></p>
         </div>
-        <div className="flex items-center space-x-2 text-sm text-gray-600">
-          <Clock className="w-4 h-4" />
-          <span>Last updated: {formatTime(new Date().toISOString())}</span>
+        <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2 text-sm text-gray-600">
+            <Clock className="w-4 h-4" />
+            <span>Last updated: {formatTime(new Date().toISOString())}</span>
+          </div>
+          <button className="btn btn-secondary" onClick={handleLogout}>Logout</button>
         </div>
       </div>
 
@@ -215,7 +370,7 @@ const FacilityDashboard = () => {
         <div className="p-6 border-b border-gray-200">
           <h2 className="text-lg font-semibold text-gray-900">Incoming Cases</h2>
           <p className="text-sm text-gray-600 mt-1">
-            Showing {filteredCases.length} of {cases.length} cases
+            Showing {filteredCases?.length || 0} of {cases?.length || 0} cases
           </p>
         </div>
 
@@ -262,12 +417,12 @@ const FacilityDashboard = () => {
                         </div>
                         <div className="text-sm text-gray-500">
                           {caseItem.primarySymptom}
-                          {caseItem.secondarySymptoms.length > 0 && (
+                          {caseItem.secondarySymptoms && caseItem.secondarySymptoms.length > 0 && (
                             <span> +{caseItem.secondarySymptoms.length}</span>
                           )}
                         </div>
                         <div className="text-xs text-gray-400">
-                          {caseItem.district}, {caseItem.subCounty}
+                          {caseItem.village || 'N/A'}, {caseItem.district}
                         </div>
                       </div>
                     </div>
@@ -283,7 +438,7 @@ const FacilityDashboard = () => {
                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadgeClass(caseItem.status)}`}>
                       {caseItem.status.replace('_', ' ').toUpperCase()}
                     </span>
-                    {caseItem.redFlagSymptoms.length > 0 && (
+                    {caseItem.redFlagSymptoms && caseItem.redFlagSymptoms.length > 0 && (
                       <div className="flex items-center mt-1 text-xs text-danger-600">
                         <AlertCircle className="w-3 h-3 mr-1" />
                         Red flags
@@ -307,24 +462,30 @@ const FacilityDashboard = () => {
                         <Eye className="w-4 h-4" />
                       </button>
                       
-                      {caseItem.status === 'pending' && (
-                        <>
-                          <button
-                            onClick={() => handleCaseAction(caseItem.id, 'confirm')}
-                            className="text-success-600 hover:text-success-900"
-                            title="Confirm Case"
-                          >
-                            <UserCheck className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleCaseAction(caseItem.id, 'reject')}
-                            className="text-danger-600 hover:text-danger-900"
-                            title="Reject Case"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </>
-                      )}
+                      {/* Show confirm and delete buttons for all cases */}
+                      <>
+                        <button
+                          onClick={() => handleCaseAction(caseItem.id, 'confirm')}
+                          className="text-success-600 hover:text-success-900"
+                          title="Confirm Case"
+                        >
+                          <UserCheck className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleCaseAction(caseItem.id, 'reject')}
+                          className="text-danger-600 hover:text-danger-900"
+                          title="Reject Case"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteCase(caseItem.id)}
+                          className="text-gray-600 hover:text-gray-900"
+                          title="Delete Case"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </>
                       
                       {caseItem.status === 'auto_assigned' && !caseItem.acknowledged && (
                         <button
@@ -342,7 +503,7 @@ const FacilityDashboard = () => {
           </table>
         </div>
 
-        {filteredCases.length === 0 && (
+        {filteredCases && filteredCases.length === 0 && (
           <div className="text-center py-12">
             <Users className="w-12 h-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">No cases found</h3>
@@ -398,7 +559,7 @@ const FacilityDashboard = () => {
                   </div>
                   <div>
                     <span className="text-gray-600">Location:</span>
-                    <span className="ml-2 font-medium">{selectedCase.district}, {selectedCase.subCounty}</span>
+                    <span className="ml-2 font-medium">{selectedCase.village || 'N/A'}, {selectedCase.district}</span>
                   </div>
                 </div>
               </div>
@@ -411,7 +572,7 @@ const FacilityDashboard = () => {
                     <span className="text-gray-600">Primary:</span>
                     <span className="ml-2 font-medium">{selectedCase.primarySymptom}</span>
                   </div>
-                  {selectedCase.secondarySymptoms.length > 0 && (
+                  {selectedCase.secondarySymptoms && selectedCase.secondarySymptoms.length > 0 && (
                     <div>
                       <span className="text-gray-600">Secondary:</span>
                       <span className="ml-2 font-medium">{selectedCase.secondarySymptoms.join(', ')}</span>
@@ -419,17 +580,17 @@ const FacilityDashboard = () => {
                   )}
                   <div>
                     <span className="text-gray-600">Severity:</span>
-                    <span className="ml-2 font-medium capitalize">{selectedCase.severity.replace('_', ' ')}</span>
+                    <span className="ml-2 font-medium capitalize">{selectedCase.severity ? selectedCase.severity.replace('_', ' ') : 'N/A'}</span>
                   </div>
                   <div>
                     <span className="text-gray-600">Duration:</span>
-                    <span className="ml-2 font-medium">{selectedCase.duration.replace(/_/g, ' ')}</span>
+                    <span className="ml-2 font-medium">{selectedCase.duration ? selectedCase.duration.replace(/_/g, ' ') : 'N/A'}</span>
                   </div>
                 </div>
               </div>
 
               {/* Red Flag Symptoms */}
-              {selectedCase.redFlagSymptoms.length > 0 && (
+              {selectedCase.redFlagSymptoms && selectedCase.redFlagSymptoms.length > 0 && (
                 <div className="bg-danger-50 border border-danger-200 p-4 rounded-lg">
                   <h4 className="font-semibold text-danger-800 mb-2 flex items-center">
                     <AlertCircle className="w-4 h-4 mr-2" />
@@ -484,31 +645,39 @@ const FacilityDashboard = () => {
                 </div>
               </div>
 
-              {/* Actions */}
-              {selectedCase.status === 'pending' && (
-                <div className="flex space-x-3 pt-4 border-t border-gray-200">
-                  <button
-                    onClick={() => {
-                      handleCaseAction(selectedCase.id, 'confirm');
-                      setSelectedCase(null);
-                    }}
-                    className="btn btn-success flex-1"
-                  >
-                    <UserCheck className="w-4 h-4 mr-2" />
-                    Confirm Case
-                  </button>
-                  <button
-                    onClick={() => {
-                      handleCaseAction(selectedCase.id, 'reject');
-                      setSelectedCase(null);
-                    }}
-                    className="btn btn-danger flex-1"
-                  >
-                    <X className="w-4 h-4 mr-2" />
-                    Reject Case
-                  </button>
-                </div>
-              )}
+              {/* Actions - Show for all cases */}
+              <div className="flex space-x-3 pt-4 border-t border-gray-200">
+                <button
+                  onClick={() => {
+                    handleCaseAction(selectedCase.id, 'confirm');
+                    setSelectedCase(null);
+                  }}
+                  className="btn btn-success flex-1"
+                >
+                  <UserCheck className="w-4 h-4 mr-2" />
+                  Confirm Case
+                </button>
+                <button
+                  onClick={() => {
+                    handleCaseAction(selectedCase.id, 'reject');
+                    setSelectedCase(null);
+                  }}
+                  className="btn btn-danger flex-1"
+                >
+                  <X className="w-4 h-4 mr-2" />
+                  Reject Case
+                </button>
+                <button
+                  onClick={() => {
+                    handleDeleteCase(selectedCase.id);
+                    setSelectedCase(null);
+                  }}
+                  className="btn btn-secondary flex-1"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete Case
+                </button>
+              </div>
 
               {selectedCase.status === 'auto_assigned' && !selectedCase.acknowledged && (
                 <div className="pt-4 border-t border-gray-200">

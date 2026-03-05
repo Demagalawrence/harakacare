@@ -73,8 +73,22 @@ CACHES = {
 # Email - Use console backend in development
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
-# CORS - Allow all origins in development
+# CORS - Allow all origins in development with credentials
 CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
+
+# Session cookie settings for cross-origin requests
+SESSION_COOKIE_SAMESITE = None
+SESSION_COOKIE_SECURE = False
+SESSION_COOKIE_NAME = 'sessionid'
+SESSION_COOKIE_DOMAIN = None  # Allow localhost and 127.0.0.1
+CSRF_COOKIE_SAMESITE = None
+CSRF_COOKIE_SECURE = False
+CSRF_COOKIE_DOMAIN = None
 
 # Celery - Use Redis as broker
 CELERY_BROKER_URL = 'redis://localhost:6379/1'
@@ -101,7 +115,9 @@ STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
 # Security settings - relaxed for development
 SECURE_SSL_REDIRECT = False
 SESSION_COOKIE_SECURE = False
+SESSION_COOKIE_SAMESITE = None
 CSRF_COOKIE_SECURE = False
+CSRF_COOKIE_SAMESITE = None
 SECURE_BROWSER_XSS_FILTER = False
 SECURE_CONTENT_TYPE_NOSNIFF = False
 

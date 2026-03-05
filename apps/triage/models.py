@@ -1126,3 +1126,50 @@ class AgentCommunicationLog(BaseModel):
 
     def __str__(self):
         return f"{self.target_agent} - {self.communication_status} - {self.triage_session.patient_token[:8]}"
+    
+
+class VillageCoordinates(models.Model):
+    """
+    Cached village coordinates from OpenStreetMap.
+    This is a cache table only - actual location data lives in TriageSession.
+    """
+    village = models.CharField(
+        _('village'),
+        max_length=100,
+        db_index=True
+    )
+    district = models.CharField(
+        _('district'),
+        max_length=100,
+        db_index=True
+    )
+    latitude = models.FloatField(
+        _('latitude'),
+        help_text=_('Cached latitude from OpenStreetMap')
+    )
+    longitude = models.FloatField(
+        _('longitude'),
+        help_text=_('Cached longitude from OpenStreetMap')
+    )
+    last_updated = models.DateTimeField(
+        _('last updated'),
+        auto_now=True,
+        help_text=_('When this cache entry was last updated')
+    )
+    lookup_count = models.IntegerField(
+        _('lookup count'),
+        default=1,
+        help_text=_('Number of times this location has been looked up')
+    )
+
+    class Meta:
+        verbose_name = _('village coordinates')
+        verbose_name_plural = _('village coordinates')
+        unique_together = ('village', 'district')
+        indexes = [
+            models.Index(fields=['village', 'district']),
+            models.Index(fields=['last_updated']),
+        ]
+
+    def __str__(self):
+        return f"{self.village}, {self.district}"

@@ -1,6 +1,14 @@
 from django.contrib import admin
-from .models import Facility
+from .models import Facility, FacilityRouting
 
+@admin.register(FacilityRouting)
+class FacilityRoutingAdmin(admin.ModelAdmin):
+    """Admin configuration for FacilityRouting model"""
+    list_display = ('patient_token', 'assigned_facility', 'primary_symptom', 'risk_level', 'routing_status', 'patient_village', 'patient_district', 'triage_received_at')
+    list_filter = ('routing_status', 'risk_level', 'assigned_facility')
+    search_fields = ('patient_token', 'primary_symptom', 'patient_village', 'patient_district')
+    ordering = ('-triage_received_at',)
+    readonly_fields = ('triage_received_at',)
 
 @admin.register(Facility)
 class FacilityAdmin(admin.ModelAdmin):
@@ -11,15 +19,15 @@ class FacilityAdmin(admin.ModelAdmin):
     with filtering, searching, and ordering capabilities.
     """
     
-    list_display = ('name', 'facility_type', 'phone_number', 'is_active', 'created_at')
+    list_display = ('name', 'facility_type', 'district', 'phone_number', 'user', 'is_active', 'created_at')
     list_filter = ('facility_type', 'is_active', 'created_at')
-    search_fields = ('name', 'address', 'phone_number')
+    search_fields = ('name', 'address', 'district', 'phone_number')
     ordering = ('name',)
     readonly_fields = ('created_at',)
     
     fieldsets = (
         ('Basic Information', {
-            'fields': ('name', 'facility_type', 'address', 'phone_number')
+            'fields': ('name', 'facility_type', 'district', 'address', 'phone_number', 'user')
         }),
         ('Location', {
             'fields': ('latitude', 'longitude'),

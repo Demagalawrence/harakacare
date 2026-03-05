@@ -7,8 +7,100 @@ Now supports complaint-based intake and age-adaptive validation
 from typing import Dict, Any, List, Tuple, Optional
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext as _
+from django.db import models
 import uuid
 import re
+import logging
+import time
+import requests
+from apps.triage.models import VillageCoordinates
+
+logger = logging.getLogger(__name__)
+
+# Rate limiting for Nominatim API
+_last_nominatim_request = 0
+
+def fetch_coordinates_from_nominatim(
+    village: str, 
+    district: str, 
+    country: str = "Uganda"
+) -> Tuple[Optional[float], Optional[float]]:
+    """
+    Fetch coordinates from OpenStreetMap Nominatim API.
+    Automatically handles rate limiting (1 request per second).
+    
+    Args:
+        village: Village name
+        district: District name
+        country: Country name (default: Uganda)
+    
+    Returns:
+        Tuple of (latitude, longitude) or (None, None) if not found/error
+    """
+    global _last_nominatim_request
+    
+    village = village.strip()
+    district = district.strip()
+    
+    if not village or not district:
+        return None, None
+    
+    # Rate limiting - ensure at least 1 second between requests
+    now = time.time()
+    time_since_last = now - _last_nominatim_request
+    if time_since_last < 1.0:
+        sleep_time = 1.0 - time_since_last
+        logger.debug(f"Rate limiting: sleeping {sleep_time:.2f}s")
+        time.sleep(sleep_time)
+    
+    query = f"{village}, {district}, {country}"
+    url = "https://nominatim.openstreetmap.org/search"
+    
+    # IMPORTANT: Replace with your actual contact email
+    headers = {
+        'User-Agent': 'HarakaCare/1.0 (triage@harakacare.ug)'
+    }
+    
+    params = {
+        'q': query,
+        'format': 'json',
+        'limit': 1,
+        'addressdetails': 1
+    }
+    
+    try:
+        logger.info(f"Fetching coordinates for: {query}")
+        response = requests.get(
+            url, 
+            headers=headers, 
+            params=params, 
+            timeout=10
+        )
+        response.raise_for_status()
+        data = response.json()
+        
+        # Update last request time AFTER successful request
+        _last_nominatim_request = time.time()
+        
+        if not data:
+            logger.info(f"No coordinates found for: {query}")
+            return None, None
+        
+        lat = float(data[0]['lat'])
+        lon = float(data[0]['lon'])
+        
+        logger.info(f"Found coordinates for {query}: {lat}, {lon}")
+        return lat, lon
+        
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Nominatim API error for {query}: {e}")
+        return None, None
+    except (KeyError, ValueError, IndexError) as e:
+        logger.error(f"Error parsing Nominatim response for {query}: {e}")
+        return None, None
+    except Exception as e:
+        logger.error(f"Unexpected error in geocoding for {query}: {e}")
+        return None, None
 
 
 class IntakeValidationTool:
@@ -124,6 +216,71 @@ class IntakeValidationTool:
             'additional_description': 'Use complaint_text instead'
         }
 
+    def _enrich_with_coordinates(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Automatically enrich triage data with coordinates if village and district are present.
+        This runs during validation, before data is saved to the database.
+        
+        The ConversationalIntakeAgent collects village and district,
+        and this method adds the coordinates before the data reaches the orchestrator.
+        """
+        # Only proceed if we have both village and district
+        village = data.get('village')
+        district = data.get('district')
+        
+        if not village or not district:
+            return data
+        
+        # Don't override existing GPS coordinates if they're already provided
+        if data.get('device_location_lat') is not None and data.get('device_location_lng') is not None:
+            logger.debug("GPS coordinates already present, skipping geocoding")
+            return data
+        
+        # Check cache first
+        try:
+            cached = VillageCoordinates.objects.get(
+                village__iexact=village.strip(),
+                district__iexact=district.strip()
+            )
+            
+            # Update lookup count (use update to avoid race conditions)
+            VillageCoordinates.objects.filter(id=cached.id).update(
+                lookup_count=models.F('lookup_count') + 1
+            )
+            
+            logger.info(f"Using cached coordinates for {village}, {district}")
+            data['device_location_lat'] = cached.latitude
+            data['device_location_lng'] = cached.longitude
+            return data
+            
+        except VillageCoordinates.DoesNotExist:
+            pass
+        
+        # Not in cache, fetch from Nominatim
+        lat, lon = fetch_coordinates_from_nominatim(village, district)
+        
+        if lat is not None and lon is not None:
+            # Save to cache (use get_or_create to handle race conditions)
+            VillageCoordinates.objects.get_or_create(
+                village__iexact=village.strip(),
+                district__iexact=district.strip(),
+                defaults={
+                    'village': village.strip(),
+                    'district': district.strip(),
+                    'latitude': lat,
+                    'longitude': lon
+                }
+            )
+            
+            # Enrich the data
+            data['device_location_lat'] = lat
+            data['device_location_lng'] = lon
+            logger.info(f"Enriched {village}, {district} with coordinates: {lat}, {lon}")
+        else:
+            logger.warning(f"Could not find coordinates for {village}, {district}")
+        
+        return data
+
     def validate(self, data: Dict[str, Any]) -> Tuple[bool, Dict[str, Any], List[str]]:
         """
         Validate incoming triage data - UPDATED
@@ -172,7 +329,7 @@ class IntakeValidationTool:
         # Validate risk modifiers if provided
         self._validate_risk_modifiers(data)
 
-        # Clean and prepare data
+        # Clean and prepare data (THIS NOW INCLUDES COORDINATE ENRICHMENT)
         cleaned_data = self._clean_data(data) if not self.errors else {}
 
         print(f"  • Valid: {len(self.errors) == 0}")
@@ -408,6 +565,7 @@ class IntakeValidationTool:
     def _clean_data(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Clean and prepare data for storage - UPDATED
+        Now includes automatic coordinate enrichment
 
         Returns:
             Cleaned data dictionary
@@ -448,6 +606,10 @@ class IntakeValidationTool:
 
         # Map deprecated fields if present (for backward compatibility)
         cleaned = self._map_deprecated_fields(cleaned)
+
+        # ===== ENRICH WITH COORDINATES =====
+        # This runs automatically for every validated intake
+        cleaned = self._enrich_with_coordinates(cleaned)
 
         return cleaned
 

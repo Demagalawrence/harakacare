@@ -1,4 +1,5 @@
 from django.db import models
+from django.conf import settings
 from django.core.validators import MinValueValidator, MaxValueValidator
 
 
@@ -38,6 +39,14 @@ class Facility(models.Model):
     address = models.TextField(
         'address',
         help_text='Physical address of the facility'
+    )
+
+    district = models.CharField(
+        'district',
+        max_length=100,
+        blank=True,
+        default='',
+        help_text='Administrative district where the facility is located'
     )
     
     phone_number = models.CharField(
@@ -122,6 +131,14 @@ class Facility(models.Model):
         default='',
         help_text='API endpoint for receiving notifications'
     )
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='facility_profile'
+    )
     
     # Status
     is_active = models.BooleanField(
@@ -148,6 +165,7 @@ class Facility(models.Model):
             models.Index(fields=['facility_type']),
             models.Index(fields=['is_active']),
             models.Index(fields=['latitude', 'longitude']),
+            models.Index(fields=['district']),
         ]
     
     def __str__(self):
@@ -268,6 +286,14 @@ class FacilityRouting(models.Model):
     )
 
     # Location information
+    patient_village = models.CharField(
+        'patient village',
+        max_length=100,
+        null=True,
+        blank=True,
+        help_text='Patient village/subcounty from triage'
+    )
+
     patient_district = models.CharField(
         'patient district',
         max_length=100,

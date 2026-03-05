@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { AlertCircle, ChevronRight, ChevronLeft, Check, X, Activity } from 'lucide-react';
+import { patientAPI } from '../services/api';
 
 const PatientTriage = () => {
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState({
-    ageRange: '',
+    age_group: '', // Changed from age_group
     sex: '',
     district: '',
     subCounty: '',
@@ -20,8 +21,9 @@ const PatientTriage = () => {
     allergyType: '',
     isPregnant: '',
     additionalNotes: '',
-    consent: false,
-    dataConsent: false
+    consent_medical_triage: false, // Changed from consent
+    consent_data_sharing: false, // Changed from dataConsent
+    consent_follow_up: false // Added new field
   });
   
   const [errors, setErrors] = useState({});
@@ -29,25 +31,35 @@ const PatientTriage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submissionResult, setSubmissionResult] = useState(null);
 
-  const ageRanges = [
-    { value: 'under5', label: 'Under 5' },
-    { value: '5-12', label: '5–12' },
-    { value: '13-17', label: '13–17' },
-    { value: '18-30', label: '18–30' },
-    { value: '31-50', label: '31–50' },
-    { value: '51+', label: '51+' }
+  const ageGroups = [ // Changed from age_groups
+    { value: 'newborn', label: 'Newborn (0-2 months)' },
+    { value: 'infant', label: 'Infant (2-12 months)' },
+    { value: 'child_1_5', label: 'Child (1-5 years)' },
+    { value: 'child_6_12', label: 'Child (6-12 years)' },
+    { value: 'teen', label: 'Teen (13-17 years)' },
+    { value: 'adult', label: 'Adult (18-64 years)' },
+    { value: 'elderly', label: 'Elderly (65+ years)' }
   ];
 
   const sexOptions = [
     { value: 'male', label: 'Male' },
     { value: 'female', label: 'Female' },
-    { value: 'prefer_not_to_say', label: 'Prefer not to say' }
+    { value: 'other', label: 'Other / Prefer not to say' }
   ];
 
   const primarySymptoms = [
-    'Fever', 'Cough', 'Shortness of breath', 'Chest pain', 'Headache',
-    'Abdominal pain', 'Nausea/Vomiting', 'Diarrhea', 'Fatigue', 'Dizziness',
-    'Skin rash', 'Joint pain', 'Sore throat', 'Body aches', 'Other'
+    { value: 'fever', label: 'Fever / feeling hot' },
+    { value: 'breathing', label: 'Breathing or cough problem' },
+    { value: 'injury', label: 'Injury or accident' },
+    { value: 'abdominal', label: 'Abdominal pain / vomiting / diarrhea' },
+    { value: 'headache', label: 'Headache / confusion / weakness' },
+    { value: 'chest_pain', label: 'Chest pain' },
+    { value: 'pregnancy', label: 'Pregnancy concern' },
+    { value: 'skin', label: 'Skin problem' },
+    { value: 'feeding', label: 'Feeding problem / general weakness' },
+    { value: 'bleeding', label: 'Bleeding / blood loss' },
+    { value: 'mental_health', label: 'Mental health / emotional crisis' },
+    { value: 'other', label: 'Other' }
   ];
 
   const secondarySymptoms = [
@@ -86,8 +98,7 @@ const PatientTriage = () => {
   ];
 
   const districts = [
-    'Nairobi', 'Mombasa', 'Kisumu', 'Nakuru', 'Eldoret', 'Kisii', 'Kitui',
-    'Garissa', 'Kakamega', 'Bungoma', 'Meru', 'Tharaka Nithi', 'Embu', 'Isiolo'
+    'Luwero'
   ];
 
   useEffect(() => {
@@ -119,10 +130,10 @@ const PatientTriage = () => {
 
     switch (step) {
       case 1:
-        if (!formData.ageRange) newErrors.ageRange = 'Age range is required';
+        if (!formData.age_group) newErrors.age_group = 'Age range is required';
         if (!formData.sex) newErrors.sex = 'Sex is required';
         if (!formData.district) newErrors.district = 'District is required';
-        if (!formData.subCounty) newErrors.subCounty = 'Sub-county is required';
+        if (!formData.village) newErrors.village = 'Village is required';
         break;
       case 2:
         if (!formData.primarySymptom) newErrors.primarySymptom = 'Primary symptom is required';
@@ -136,13 +147,14 @@ const PatientTriage = () => {
         if (formData.hasAllergies === 'yes' && !formData.allergyType) {
           newErrors.allergyType = 'Please specify allergy type';
         }
-        if (formData.sex === 'female' && (formData.ageRange === '13-17' || formData.ageRange === '18-30' || formData.ageRange === '31-50') && !formData.isPregnant) {
+        if (formData.sex === 'female' && (formData.age_group === 'teen' || formData.age_group === 'adult') && !formData.isPregnant) {
           newErrors.isPregnant = 'Pregnancy status is required';
         }
         break;
       case 5:
-        if (!formData.consent) newErrors.consent = 'You must consent to proceed';
-        if (!formData.dataConsent) newErrors.dataConsent = 'You must consent to data processing';
+        if (!formData.consent_medical_triage) newErrors.consent_medical_triage = 'You must consent to medical triage to proceed';
+        if (!formData.consent_data_sharing) newErrors.consent_data_sharing = 'You must consent to data processing to proceed';
+        if (!formData.consent_follow_up) newErrors.consent_follow_up = 'You must consent to follow-up care to proceed';
         break;
       default:
         break;
@@ -167,24 +179,64 @@ const PatientTriage = () => {
 
     setIsSubmitting(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      const mockResponse = {
-        success: true,
-        riskLevel: formData.redFlagSymptoms.length > 0 ? 'high' : 
-                 formData.severity === 'very_severe' ? 'medium' : 'low',
-        caseId: 'HC-' + Math.random().toString(36).substr(2, 9).toUpperCase(),
-        recommendation: formData.redFlagSymptoms.length > 0 
-          ? 'Seek immediate medical attention at the nearest emergency facility.'
-          : 'Please visit a healthcare facility within 24 hours for evaluation.'
+      // Map frontend form data to backend field names
+      const backendData = {
+        age_group: formData.age_group,
+        sex: formData.sex,
+        district: formData.district,
+        village: formData.village || '', // Ensure empty string if not provided
+        complaint_group: formData.primarySymptom, // Use the value directly
+        patient_relation: 'self', // Default value
+        consent_medical_triage: formData.consent_medical_triage,
+        consent_data_sharing: formData.consent_data_sharing,
+        consent_follow_up: formData.consent_follow_up,
+        location_consent: false, // Default value
+        // Add any other potentially required fields with defaults
+        complaint_text: '', // Empty string since we're using complaint_group
+        device_location_lat: null, // Optional field
+        device_location_lng: null, // Optional field
       };
 
-      setSubmissionResult(mockResponse);
+      console.log('Submitting data:', JSON.stringify(backendData, null, 2));
+
+      // Use real API call with correct endpoint (token generated in API service)
+      const response = await patientAPI.submitTriage(backendData);
+      
+      console.log('Backend response:', response);
+      
+      // Format response for frontend display
+      setSubmissionResult({
+        success: true,
+        caseId: response.patient_token,
+        riskLevel: response.risk_level,
+        recommendation: response.recommended_action,
+        followUpRequired: response.follow_up_required,
+        followUpTimeframe: response.follow_up_timeframe
+      });
     } catch (error) {
+      console.error('Submission error:', error);
+      console.error('Error response:', error.response?.data);
+      console.error('Validation errors:', error.response?.data?.errors);
+      
+      // Show specific validation errors if available
+      const errorData = error.response?.data;
+      let errorMessage = 'Failed to submit your information. Please try again.';
+      
+      if (errorData?.errors) {
+        // Show the first validation error
+        const firstError = Object.values(errorData.errors)[0];
+        if (Array.isArray(firstError) && firstError.length > 0) {
+          errorMessage = firstError[0];
+        } else if (typeof firstError === 'string') {
+          errorMessage = firstError;
+        }
+      } else if (errorData?.error) {
+        errorMessage = errorData.error;
+      }
+      
       setSubmissionResult({
         success: false,
-        error: 'Failed to submit your information. Please try again.'
+        error: errorMessage
       });
     } finally {
       setIsSubmitting(false);
@@ -194,10 +246,10 @@ const PatientTriage = () => {
   const resetForm = () => {
     setCurrentStep(1);
     setFormData({
-      ageRange: '',
+      age_group: '',
       sex: '',
       district: '',
-      subCounty: '',
+      village: '',
       primarySymptom: '',
       secondarySymptoms: [],
       severity: '',
@@ -331,13 +383,13 @@ const PatientTriage = () => {
                 Age Range *
               </label>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                {ageRanges.map((range) => (
+                {ageGroups.map((range) => (
                   <button
                     key={range.value}
                     type="button"
-                    onClick={() => handleInputChange('ageRange', range.value)}
+                    onClick={() => handleInputChange('age_group', range.value)}
                     className={`p-3 rounded-lg border-2 transition-colors ${
-                      formData.ageRange === range.value
+                      formData.age_group === range.value
                         ? 'border-primary-500 bg-primary-50 text-primary-700'
                         : 'border-gray-200 hover:border-gray-300'
                     }`}
@@ -346,7 +398,7 @@ const PatientTriage = () => {
                   </button>
                 ))}
               </div>
-              {errors.ageRange && <p className="text-danger-600 text-sm mt-1">{errors.ageRange}</p>}
+              {errors.age_group && <p className="text-danger-600 text-sm mt-1">{errors.age_group}</p>}
             </div>
 
             <div>
@@ -391,16 +443,16 @@ const PatientTriage = () => {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Sub-county *
+                Village *
               </label>
               <input
                 type="text"
-                value={formData.subCounty}
-                onChange={(e) => handleInputChange('subCounty', e.target.value)}
-                placeholder="Enter sub-county"
+                value={formData.village}
+                onChange={(e) => handleInputChange('village', e.target.value)}
+                placeholder="Enter village"
                 className="input-field"
               />
-              {errors.subCounty && <p className="text-danger-600 text-sm mt-1">{errors.subCounty}</p>}
+              {errors.village && <p className="text-danger-600 text-sm mt-1">{errors.village}</p>}
             </div>
           </div>
         )}
@@ -417,16 +469,16 @@ const PatientTriage = () => {
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 {primarySymptoms.map((symptom) => (
                   <button
-                    key={symptom}
+                    key={symptom.value}
                     type="button"
-                    onClick={() => handleInputChange('primarySymptom', symptom)}
+                    onClick={() => handleInputChange('primarySymptom', symptom.value)}
                     className={`p-3 rounded-lg border-2 transition-colors text-sm ${
-                      formData.primarySymptom === symptom
+                      formData.primarySymptom === symptom.value
                         ? 'border-primary-500 bg-primary-50 text-primary-700'
                         : 'border-gray-200 hover:border-gray-300'
                     }`}
                   >
-                    {symptom}
+                    {symptom.label}
                   </button>
                 ))}
               </div>
@@ -636,7 +688,7 @@ const PatientTriage = () => {
               </div>
             )}
 
-            {formData.sex === 'female' && (formData.ageRange === '13-17' || formData.ageRange === '18-30' || formData.ageRange === '31-50') && (
+            {formData.sex === 'female' && (formData.age_group === '13-17' || formData.age_group === '18-30' || formData.age_group === '31-50') && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Are you currently pregnant? *
@@ -684,10 +736,10 @@ const PatientTriage = () => {
             <div className="bg-gray-50 p-6 rounded-lg">
               <h4 className="font-semibold mb-4">Review Your Information</h4>
               <div className="space-y-2 text-sm">
-                <div><strong>Age Range:</strong> {ageRanges.find(r => r.value === formData.ageRange)?.label}</div>
+                <div><strong>Age Range:</strong> {ageGroups.find(r => r.value === formData.age_group)?.label}</div>
                 <div><strong>Sex:</strong> {sexOptions.find(s => s.value === formData.sex)?.label}</div>
-                <div><strong>Location:</strong> {formData.district}, {formData.subCounty}</div>
-                <div><strong>Primary Symptom:</strong> {formData.primarySymptom}</div>
+                <div><strong>Location:</strong> {formData.district}, {formData.village}</div>
+                <div><strong>Primary Symptom:</strong> {primarySymptoms.find(s => s.value === formData.primarySymptom)?.label}</div>
                 {formData.secondarySymptoms.length > 0 && (
                   <div><strong>Secondary Symptoms:</strong> {formData.secondarySymptoms.join(', ')}</div>
                 )}
@@ -706,28 +758,41 @@ const PatientTriage = () => {
               <label className="flex items-start space-x-3">
                 <input
                   type="checkbox"
-                  checked={formData.consent}
-                  onChange={(e) => handleInputChange('consent', e.target.checked)}
+                  checked={formData.consent_medical_triage}
+                  onChange={(e) => handleInputChange('consent_medical_triage', e.target.checked)}
                   className="mt-1 w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
                 />
                 <span className="text-sm text-gray-700">
                   I consent to participate in this health assessment and understand that this is not a substitute for professional medical advice.
                 </span>
               </label>
-              {errors.consent && <p className="text-danger-600 text-sm">{errors.consent}</p>}
+              {errors.consent_medical_triage && <p className="text-danger-600 text-sm">{errors.consent_medical_triage}</p>}
 
               <label className="flex items-start space-x-3">
                 <input
                   type="checkbox"
-                  checked={formData.dataConsent}
-                  onChange={(e) => handleInputChange('dataConsent', e.target.checked)}
+                  checked={formData.consent_data_sharing}
+                  onChange={(e) => handleInputChange('consent_data_sharing', e.target.checked)}
                   className="mt-1 w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
                 />
                 <span className="text-sm text-gray-700">
                   I consent to the processing of my personal health information for the purpose of this assessment and subsequent healthcare coordination.
                 </span>
               </label>
-              {errors.dataConsent && <p className="text-danger-600 text-sm">{errors.dataConsent}</p>}
+              {errors.consent_data_sharing && <p className="text-danger-600 text-sm">{errors.consent_data_sharing}</p>}
+
+              <label className="flex items-start space-x-3">
+                <input
+                  type="checkbox"
+                  checked={formData.consent_follow_up}
+                  onChange={(e) => handleInputChange('consent_follow_up', e.target.checked)}
+                  className="mt-1 w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                />
+                <span className="text-sm text-gray-700">
+                  I consent to being contacted for follow-up care and additional health assessments as needed.
+                </span>
+              </label>
+              {errors.consent_follow_up && <p className="text-danger-600 text-sm">{errors.consent_follow_up}</p>}
             </div>
 
             <div className="bg-warning-50 border border-warning-200 p-4 rounded-lg">

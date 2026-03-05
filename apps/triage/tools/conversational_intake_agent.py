@@ -32,6 +32,7 @@ from django.core.cache import cache
 
 from apps.triage.ml_models import APISymptomExtractor, generate_followup_questions
 from apps.conversations.models import Conversation, Message
+from apps.triage.tools.intake_validation import IntakeValidationTool 
 
 logger = logging.getLogger(__name__)
 
@@ -1372,144 +1373,6 @@ class ConversationalIntakeAgent:
 # INTAKE VALIDATION TOOL
 # ============================================================================
 
-class IntakeValidationTool:
-    """Validates structured triage data before submission to the orchestrator."""
-
-    REQUIRED_FIELDS = ALL_REQUIRED_FIELDS
-
-    VALID_CHOICES: Dict[str, List[str]] = {
-        "complaint_group": [
-            "fever", "breathing", "injury", "abdominal", "headache",
-            "chest_pain", "pregnancy", "skin", "feeding", "bleeding",
-            "mental_health", "other",
-        ],
-        "age_group": ["newborn", "infant", "child_1_5", "child_6_12", "teen", "adult", "elderly"],
-        "sex": ["male", "female", "other"],
-        "patient_relation": ["self", "child", "family", "other"],
-        "symptom_severity": ["mild", "moderate", "severe", "very_severe"],
-        "symptom_duration": [
-            "less_than_1_hour", "1_6_hours", "6_24_hours", "1_3_days",
-            "4_7_days", "more_than_1_week", "more_than_1_month",
-        ],
-        "progression_status": [
-            "sudden", "getting_worse", "staying_same", "getting_better", "comes_and_goes",
-        ],
-        "pregnancy_status": ["yes", "possible", "no", "not_applicable"],
-        "channel": ["ussd", "sms", "whatsapp", "web", "mobile_app"],
-        "condition_occurrence": ["first", "happened_before", "long_term"],
-        "allergies_status":     ["yes", "no", "not_sure"],
-        "allergy_types":        ["medication", "food", "environmental"],
-    }
-
-    def __init__(self):
-        self.agent    = ConversationalIntakeAgent()
-        self.errors:   List[str] = []
-        self.warnings: List[str] = []
-
-    def process_intake(self, patient_token: str, free_text: str,
-                       conversation_id: Optional[str] = None) -> Dict[str, Any]:
-        if conversation_id:
-            return self.agent.continue_conversation(patient_token, free_text)
-        return self.agent.start_conversation(patient_token, free_text)
-
-    def validate(self, data: Dict[str, Any]) -> Tuple[bool, Dict[str, Any], List[str]]:
-        self.errors   = []
-        self.warnings = []
-        self._validate_required(data)
-        self._validate_consents(data)
-        self._validate_field_choices(data)
-        self._validate_consistency(data)
-        self._validate_age_group(data)
-        self._validate_condition_occurrence(data)
-        self._validate_allergies(data)
-        self._validate_pregnancy(data)
-        cleaned = self._clean(data) if not self.errors else {}
-        return (not self.errors, cleaned, self.errors)
-
-    def _validate_required(self, data: Dict):
-        for f in self.REQUIRED_FIELDS:
-            if not data.get(f):
-                self.errors.append(f"Required field '{f}' is missing")
-
-    def _validate_consents(self, data: Dict):
-        for c in ["consent_medical_triage", "consent_data_sharing", "consent_follow_up"]:
-            if not data.get(c):
-                self.errors.append(f"Patient must consent to: {c}")
-
-    def _validate_field_choices(self, data: Dict):
-        for field, valid in self.VALID_CHOICES.items():
-            value = data.get(field)
-            if not value:
-                continue
-            if isinstance(value, list):
-                for item in value:
-                    if item not in valid:
-                        self.errors.append(f"Invalid value '{item}' for '{field}'.")
-            elif value not in valid:
-                self.errors.append(f"Invalid value '{value}' for '{field}'.")
-
-    def _validate_consistency(self, data: Dict):
-        if data.get("sex") == "male" and data.get("pregnancy_status") in ["yes", "possible"]:
-            self.errors.append("Inconsistency: male patient cannot be pregnant.")
-        if data.get("age_group") in ["newborn", "infant", "child_1_5", "child_6_12"] and \
-                "hypertension" in data.get("chronic_conditions", []):
-            self.warnings.append("Unusual: hypertension in a child — please verify.")
-
-    def _validate_age_group(self, data: Dict):
-        valid = self.VALID_CHOICES["age_group"]
-        ag = data.get("age_group")
-        if ag and ag not in valid:
-            self.errors.append(f"Invalid age_group '{ag}'.")
-
-    def _validate_condition_occurrence(self, data: Dict):
-        value = data.get("condition_occurrence")
-        if value and value not in self.VALID_CHOICES["condition_occurrence"]:
-            self.errors.append(f"Invalid condition_occurrence '{value}'.")
-
-    def _validate_allergies(self, data: Dict):
-        status = data.get("allergies_status")
-        if status and status not in self.VALID_CHOICES["allergies_status"]:
-            self.errors.append(f"Invalid allergies_status '{status}'.")
-        types = data.get("allergy_types", [])
-        if types and not isinstance(types, list):
-            self.errors.append("allergy_types must be a list")
-        elif types:
-            for t in types:
-                if t not in self.VALID_CHOICES["allergy_types"]:
-                    self.errors.append(f"Invalid allergy_type '{t}'.")
-
-    def _validate_pregnancy(self, data: Dict):
-        """Ensure pregnancy_status is captured for female teens/adults."""
-        if (
-            data.get("sex") == "female"
-            and data.get("age_group") in ("teen", "adult")
-            and not data.get("pregnancy_status")
-        ):
-            self.warnings.append(
-                "pregnancy_status missing for female teen/adult patient — "
-                "should be captured before triage completion."
-            )
-
-    def _clean(self, data: Dict) -> Dict:
-        cleaned = data.copy()
-        if "patient_token" not in cleaned:
-            cleaned["patient_token"] = f"PT-{uuid.uuid4().hex[:16].upper()}"
-        cleaned.setdefault("session_status",      "in_progress")
-        cleaned.setdefault("channel",             "whatsapp")
-        cleaned.setdefault("symptom_indicators",  {})
-        cleaned.setdefault("red_flag_indicators", {})
-        cleaned.setdefault("risk_modifiers",      {})
-        cleaned.setdefault("chronic_conditions",  [])
-        cleaned.setdefault("allergy_types",       [])
-
-        if "age_range" in cleaned and "age_group" not in cleaned:
-            cleaned["age_group"] = {
-                "under_5": "child_1_5", "5_12": "child_6_12",
-                "13_17": "teen", "18_30": "adult",
-                "31_50": "adult", "51_plus": "elderly",
-            }.get(cleaned["age_range"], "adult")
-
-        return cleaned
 
 
 # ============================================================================
@@ -1522,3 +1385,5 @@ def process_conversational_intake(patient_token: str, text: str) -> Dict[str, An
 
 def validate_structured_intake(data: Dict[str, Any]) -> Tuple[bool, Dict[str, Any], List[str]]:
     return IntakeValidationTool().validate(data)
+
+    

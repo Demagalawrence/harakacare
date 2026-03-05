@@ -28,9 +28,9 @@ class NotificationDispatchTool:
     """
 
     def __init__(self):
-        self.session = self._create_http_session()
         self.max_retries = 3
         self.timeout_seconds = 30
+        self.session = self._create_http_session()
 
     def _create_http_session(self) -> requests.Session:
         """Create HTTP session with retry strategy"""

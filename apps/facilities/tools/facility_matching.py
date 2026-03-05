@@ -44,18 +44,47 @@ class FacilityMatchingTool:
         # Base facility query
         facilities = Facility.objects.filter(is_active=True)
         
-        # Filter by location (same district first, then nearby)
-        district_facilities = facilities.filter(address__icontains=routing.patient_district)
-        nearby_facilities = self._find_nearby_facilities(routing, exclude=district_facilities)
+        # Filter by location (same village first, then same district, then nearby)
+        village_value = (routing.patient_village or '').strip()
+        district_value = (routing.patient_district or '').strip()
         
-        # Combine results
-        all_facilities = (district_facilities | nearby_facilities).distinct()
+        if village_value:
+            # Priority 1: Same village (exact match)
+            village_facilities = facilities.filter(
+                Q(address__icontains=village_value) | Q(district__icontains=village_value)
+            )
+        elif district_value:
+            # Priority 2: Same district
+            district_facilities = facilities.filter(
+                Q(district__iexact=district_value) | Q(address__icontains=district_value)
+            )
+            village_facilities = facilities.none()
+        else:
+            village_facilities = facilities.none()
+            district_facilities = facilities.none()
+            
+        nearby_facilities = self._find_nearby_facilities(routing, exclude=village_facilities | district_facilities)
+        
+        # Combine results (village + district + nearby)
+        all_facilities = (village_facilities | district_facilities | nearby_facilities).distinct()
         
         # Score and rank facilities
         candidates = []
         for facility in all_facilities[:max_candidates * 2]:  # Get more to filter
             score_data = self._calculate_match_score(facility, routing)
-            if score_data['score'] > 0.1:  # Minimum threshold
+            # Always allow same-district facilities through (important when coordinates or
+            # service catalogs are missing in development data).
+            is_same_district = False
+            try:
+                is_same_district = bool(
+                    routing.patient_district
+                    and facility.district
+                    and facility.district.strip().lower() == routing.patient_district.strip().lower()
+                )
+            except Exception:
+                is_same_district = False
+
+            if score_data['score'] > 0.1 or is_same_district:  # Minimum threshold
                 candidate = FacilityCandidate(
                     routing=routing,
                     facility=facility,
@@ -125,8 +154,11 @@ class FacilityMatchingTool:
         score = 0.0
         factors = []
         
-        # 1. Distance score (0-0.3)
-        distance = facility.distance_to(routing.patient_location_lat, routing.patient_location_lng)
+        # 1. Distance score (0-0.3) - handle missing coordinates
+        if routing.patient_location_lat and routing.patient_location_lng:
+            distance = facility.distance_to(routing.patient_location_lat, routing.patient_location_lng)
+        else:
+            distance = None
         distance_score = self._calculate_distance_score(distance)
         score += distance_score * 0.3
         factors.append(f"Distance: {distance_score:.2f}")
@@ -273,6 +305,9 @@ class FacilityMatchingTool:
             'vomiting': ['general_medicine'],
             'diarrhea': ['general_medicine'],
             'skin_problem': ['general_medicine', 'diagnostics'],
+            # Complaint-group values used by the triage system
+            'pregnancy': ['obstetrics'],
+            'mental_health': ['mental_health'],
         }
         
         primary_service = symptom_service_map.get(routing.primary_symptom, ['general_medicine'])
@@ -298,7 +333,12 @@ class FacilityMatchingTool:
         """Check if facility offers required services"""
         required_services = self._get_required_services(routing)
         offered_services = facility.services_offered or []
-        
+
+        # If a facility hasn't been configured with a service catalog yet,
+        # treat it as a general provider in development.
+        if not offered_services:
+            return True
+
         return any(service in offered_services for service in required_services)
 
     def get_best_match(self, routing: FacilityRouting) -> Optional[FacilityCandidate]:

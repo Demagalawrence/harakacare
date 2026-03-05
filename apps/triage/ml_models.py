@@ -1,23 +1,15 @@
 """
 ml_models.py — HuggingFace-backed symptom extraction + intelligent question generation
-Hybrid State-Machine Edition
+UPDATED: LLM-first extraction, full conversation history, question tracking, emergency-first
 
-LLM responsibilities (what it DOES):
-  - Extract free-text symptoms, complaint group, location, demographics
-  - Generate empathetic follow-up questions for open-ended fields
-  - Understand complex symptom descriptions
-
-LLM responsibilities (what it DOES NOT do):
-  - Infer pregnancy from vague replies  → MenuResolver handles this
-  - Interpret numeric menu selections   → MenuResolver handles this
-  - Override deterministic structured inputs
-
-CHANGE SUMMARY vs previous version:
-  - generate_followup_questions: accepts asked_fields_history as Set[str]
-    and EXCLUDES those fields from questions even if still in missing_fields
-  - STRUCTURED_FIELDS constant imported/referenced so LLM prompts never ask
-    for menu-captured fields
-  - Question system prompt updated to reflect hybrid architecture
+CHANGE 9:
+  _EXTRACTION_SYSTEM JSON schema now includes:
+    progression_status, condition_occurrence, allergies_status,
+    allergy_types, village, chronic_conditions (list), on_medication
+  normalize_result handles new fields
+  _build_result passes new fields through
+  _regex_fallback returns defaults for new fields
+  generate_followup_questions field_labels includes new fields
 """
 
 import os
@@ -39,13 +31,6 @@ client = InferenceClient(
     token=HF_TOKEN
 )
 
-# Fields captured via deterministic menus — LLM must never ask for these
-_MENU_CAPTURED_FIELDS: Set[str] = {
-    "progression_status", "duration", "severity",
-    "pregnancy_status", "condition_occurrence", "allergies",
-    "on_medication", "consents",
-}
-
 
 # ============================================================================
 # DATA STRUCTURE
@@ -63,6 +48,8 @@ class ExtractedSymptom:
 # ============================================================================
 
 def normalize_result(data: dict) -> dict:
+    """Normalize extracted data to match our model's expected format"""
+
     severity_map = {
         "mild/moderate": "moderate", "moderate/severe": "severe",
         "mild/severe": "moderate",   "very severe": "very_severe",
@@ -118,6 +105,7 @@ def normalize_result(data: dict) -> dict:
         "comes and goes": "comes_and_goes", "on and off": "comes_and_goes",
         "intermittent": "comes_and_goes", "periodic": "comes_and_goes",
     }
+    # NEW: condition_occurrence normalisation
     condition_occurrence_map = {
         "first time": "first", "never had": "first", "new": "first",
         "happened before": "happened_before", "recurring": "happened_before",
@@ -125,15 +113,21 @@ def normalize_result(data: dict) -> dict:
         "chronic": "long_term", "long term": "long_term", "always": "long_term",
         "ongoing": "long_term", "persistent": "long_term",
     }
+    # NEW: allergies_status normalisation
     allergy_status_map = {
         "yes": "yes", "allergic": "yes", "have allergies": "yes",
         "no": "no", "none": "no", "no allergies": "no",
         "not sure": "not_sure", "maybe": "not_sure", "unsure": "not_sure",
     }
 
-    data["severity"]   = severity_map.get((data.get("severity") or "").lower().strip(), data.get("severity"))
-    data["duration"]   = duration_map.get((data.get("duration") or "").strip(), data.get("duration"))
-
+    data["severity"]   = severity_map.get(
+        (data.get("severity") or "").lower().strip(),
+        data.get("severity")
+    )
+    data["duration"]   = duration_map.get(
+        (data.get("duration") or "").strip(),
+        data.get("duration")
+    )
     ag = (data.get("age_group") or "").lower().strip()
     if ag: data["age_group"] = age_group_map.get(ag, ag)
 
@@ -143,6 +137,7 @@ def normalize_result(data: dict) -> dict:
     prog = (data.get("progression_status") or "").lower().strip()
     if prog: data["progression_status"] = progression_map.get(prog, prog)
 
+    # NEW normalizations
     co = (data.get("condition_occurrence") or "").lower().strip()
     if co: data["condition_occurrence"] = condition_occurrence_map.get(co, co)
 
@@ -176,6 +171,7 @@ def _call_llm(system: str, user: str, max_tokens: int = 400) -> Optional[str]:
 # SYMPTOM EXTRACTION — LLM PRIMARY, REGEX FALLBACK
 # ============================================================================
 
+# ── CHANGE 9: Expanded JSON schema ───────────────────────────────────────────
 _EXTRACTION_SYSTEM = """You are a clinical data extraction engine for a Ugandan medical triage system.
 Extract ONLY what is explicitly stated in the patient message.
 Return ONLY a raw JSON object with NO explanation, NO markdown, NO code blocks.
@@ -188,7 +184,7 @@ JSON format:
   "secondary_symptoms": [],
   "severity": "mild|moderate|severe|very_severe|null",
   "severity_confidence": 0.0-1.0,
-  "severity_reason": "brief reason",
+  "severity_reason": "brief reason for classification",
   "duration": "less_than_1_hour|1_6_hours|6_24_hours|1_3_days|4_7_days|more_than_1_week|more_than_1_month|null",
   "duration_confidence": 0.0-1.0,
   "progression_status": "sudden|getting_worse|staying_same|getting_better|comes_and_goes|null",
@@ -204,7 +200,7 @@ JSON format:
   "district": "district name or null",
   "subcounty": "subcounty or null",
   "village": "village/LC1/area or null",
-  "landmark": "any landmark or null",
+  "landmark": "any landmark mentioned or null",
   "location_confidence": 0.0-1.0,
   "red_flags": [],
   "symptom_indicators": {},
@@ -214,47 +210,82 @@ JSON format:
   "consents_given": true|false
 }
 
-IMPORTANT RULES:
-- Extract only what is EXPLICITLY stated. Do NOT infer from vague replies like "yes", "no", "same".
-- pregnancy_status: only extract if patient explicitly mentions pregnancy. "yes"/"no" alone must NOT be mapped here.
-- severity/duration/progression: only extract if the patient describes these in their own words.
-  If the patient replied to a numbered menu (e.g. "2"), leave these null — the state machine handles them.
-- Set confidence to 0.0 if information is NOT mentioned in the text.
+CLASSIFICATION RULES:
 
-complaint_group classification:
-- "fever" = omusujja, temperature, hot body, malaria with fever
-- "breathing" = cough, wheezing, difficulty breathing, chest tightness
-- "abdominal" = stomach pain, vomiting, diarrhea, nausea
-- "headache" = head pain, migraine, dizziness
-- "chest_pain" = chest pain, heart pain (NOT cough)
-- "injury" = cuts, falls, accidents, fractures
+complaint_group — classify based on DOMINANT symptom:
+- "fever" = omusujja, temperature, hot body, malaria symptoms with fever
+- "breathing" = cough, wheezing, difficulty breathing, chest tightness, shortness of breath
+- "abdominal" = stomach pain, vomiting, diarrhea, nausea, belly pain
+- "headache" = head pain, migraine, dizziness, confusion
+- "chest_pain" = chest pain, heart pain (NOT cough — that is "breathing")
+- "injury" = cuts, falls, accidents, fractures, wounds
 - "skin" = rash, itching, skin changes
-- "feeding" = poor appetite, weight loss, breastfeeding issues
+- "feeding" = not eating, poor appetite, weight loss, breastfeeding issues
 - "bleeding" = blood loss, hemorrhage
 - "pregnancy" = pregnancy concern, antenatal
-- "mental_health" = depression, anxiety, stress
+- "mental_health" = depression, anxiety, stress, suicidal thoughts
 
-red_flags (WHO IMCI danger signs):
-"airway_obstruction","severe_breathing_difficulty","chest_indrawing",
-"severe_bleeding","signs_of_shock","unconscious","convulsions","confusion",
-"unable_to_drink","vomits_everything","lethargic_floppy",
-"pregnancy_emergency","severe_abdominal_pain","stroke_signs","chest_pain_cardiac"
+progression_status — symptom trajectory:
+- "sudden" = started all at once, abrupt onset
+- "getting_worse" = worsening, deteriorating
+- "staying_same" = stable, unchanged, no better no worse
+- "getting_better" = improving, recovering
+- "comes_and_goes" = intermittent, on and off, periodic
 
-symptom_indicators (boolean map):
-{"fever":bool,"cough":bool,"breathing_difficulty":bool,"chest_pain":bool,
- "vomiting":bool,"diarrhea":bool,"rash":bool,"fatigue":bool,
- "dizziness":bool,"confusion":bool,"bleeding":bool,"convulsions":bool,
- "headache":bool,"can_drink":bool}
+condition_occurrence — is this the first time, recurring, or chronic?
+- "first" = patient says first time, never had this before, new symptom
+- "happened_before" = had this before, came back, again, recurring
+- "long_term" = chronic, always have it, for months/years, persistent, ongoing
 
-chronic_conditions list:
-["diabetes","hypertension","asthma","heart_disease","epilepsy",
- "sickle_cell","hiv_aids","copd","kidney_disease","liver_disease","cancer"]
+allergies_status — does the patient have known allergies?
+- "yes" = confirms allergies (then populate allergy_types)
+- "no" = no allergies, not allergic
+- "not_sure" = unsure, maybe, possibly
+allergy_types — list of: "medication", "food", "environmental" (only if allergies_status="yes")
+Examples: penicillin/aspirin → "medication"; nuts/milk → "food"; pollen/dust/pets → "environmental"
 
-age_group 7 categories:
-newborn=0-2mo; infant=2-12mo; child_1_5=1-5y; child_6_12=6-12y;
-teen=13-17y; adult=18-64y; elderly=65+
-Luganda: omwana=child, omukadde=elderly, omusajja=man, omukazi=woman
+severity — use CLINICAL assessment not just patient words:
+- "mild" = can do all normal activities, minor discomfort
+- "moderate" = some difficulty with daily activities, noticeable symptoms
+- "severe" = unable to do normal activities, significant impairment
+- "very_severe" = unable to move/talk/function, danger signs present
+ESCALATE severity based on: high fever (≥38.5°C) = at least moderate; fever 3+ days = at least moderate;
+fever + headache = at least moderate; inability to drink = severe
+
+red_flags — WHO IMCI danger signs (list of strings):
+- "airway_obstruction", "severe_breathing_difficulty", "chest_indrawing"
+- "severe_bleeding", "signs_of_shock"
+- "unconscious", "convulsions", "confusion"
+- "unable_to_drink", "vomits_everything", "lethargic_floppy"
+- "pregnancy_emergency", "severe_abdominal_pain"
+- "stroke_signs", "chest_pain_cardiac"
+
+symptom_indicators — boolean map of symptoms present:
+{"fever": bool, "cough": bool, "breathing_difficulty": bool, "chest_pain": bool,
+ "vomiting": bool, "diarrhea": bool, "rash": bool, "fatigue": bool,
+ "dizziness": bool, "confusion": bool, "bleeding": bool, "convulsions": bool,
+ "headache": bool, "can_drink": bool}
+
+age_group — 7 categories:
+- newborn = 0-2 months; infant = 2-12 months; child_1_5 = 1-5 years
+- child_6_12 = 6-12 years; teen = 13-17 years; adult = 18-64 years; elderly = 65+
+Also recognize Luganda: omwana=child, omukadde=elderly, omusajja=man, omukazi=woman
+
+chronic_conditions — list of known chronic conditions mentioned explicitly:
+["diabetes", "hypertension", "asthma", "heart_disease", "epilepsy", "sickle_cell",
+ "hiv_aids", "copd", "kidney_disease", "liver_disease", "cancer"] or []
+
+on_medication — is the patient currently taking any medication?
+- true = explicitly says taking medication, tablets, drugs, treatment
+- false = explicitly says no medication, not taking anything
+- null = not mentioned
+
+village — village name, LC1, or specific area (more specific than district/subcounty)
+
+IMPORTANT: Set confidence to 0.0 if information is NOT mentioned in the text.
+Do NOT infer or guess. If unclear, output null.
 """
+# ─────────────────────────────────────────────────────────────────────────────
 
 
 def _extract_json(text: str) -> Optional[Dict]:
@@ -289,7 +320,7 @@ class APISymptomExtractor:
         prompt = (
             f"Full conversation history:\n{history_text}\n\n"
             f"Latest patient message: {text}\n\n"
-            "Extract from the LATEST message, use history only to resolve ambiguities."
+            "Extract information from the LATEST message, but use history to resolve ambiguities."
         )
         raw = _call_llm(_EXTRACTION_SYSTEM, prompt, max_tokens=500)
         if raw:
@@ -305,36 +336,36 @@ class APISymptomExtractor:
         symptoms.extend(result.get("secondary_symptoms", []))
 
         return {
-            "symptoms":                   symptoms,
-            "severity":                   result.get("severity"),
-            "severity_confidence":        result.get("severity_confidence", 0.0),
-            "severity_reason":            result.get("severity_reason", ""),
-            "duration":                   result.get("duration"),
-            "duration_confidence":        result.get("duration_confidence", 0.0),
-            "complaint_group":            result.get("complaint_group"),
+            "symptoms":                 symptoms,
+            "severity":                 result.get("severity"),
+            "severity_confidence":      result.get("severity_confidence", 0.0),
+            "severity_reason":          result.get("severity_reason", ""),
+            "duration":                 result.get("duration"),
+            "duration_confidence":      result.get("duration_confidence", 0.0),
+            "complaint_group":          result.get("complaint_group"),
             "complaint_group_confidence": result.get("complaint_group_confidence", 0.0),
-            "age_group":                  result.get("age_group"),
-            "age_group_confidence":       result.get("age_group_confidence", 0.0),
-            "sex":                        result.get("sex"),
-            "pregnancy_status":           result.get("pregnancy_status"),
-            "patient_relation":           result.get("patient_relation"),
-            "location_raw":               result.get("location_raw"),
-            "district":                   result.get("district"),
-            "subcounty":                  result.get("subcounty"),
-            "village":                    result.get("village"),
-            "landmark":                   result.get("landmark"),
-            "location_confidence":        result.get("location_confidence", 0.0),
-            "progression_status":         result.get("progression_status"),
-            "condition_occurrence":       result.get("condition_occurrence"),
-            "allergies_status":           result.get("allergies_status"),
-            "allergy_types":              result.get("allergy_types", []),
-            "chronic_conditions":         result.get("chronic_conditions", []),
-            "on_medication":              result.get("on_medication"),
-            "red_flags":                  result.get("red_flags", []),
-            "symptom_indicators":         result.get("symptom_indicators", {}),
-            "medications_mentioned":      result.get("medications_mentioned", []),
-            "consents_given":             result.get("consents_given", False),
-            "confidence":                 result.get("complaint_group_confidence", 0.85),
+            "age_group":                result.get("age_group"),
+            "age_group_confidence":     result.get("age_group_confidence", 0.0),
+            "sex":                      result.get("sex"),
+            "pregnancy_status":         result.get("pregnancy_status"),
+            "patient_relation":         result.get("patient_relation"),
+            "location_raw":             result.get("location_raw"),
+            "district":                 result.get("district"),
+            "subcounty":                result.get("subcounty"),
+            "village":                  result.get("village"),       # NEW
+            "landmark":                 result.get("landmark"),
+            "location_confidence":      result.get("location_confidence", 0.0),
+            "progression_status":       result.get("progression_status"),
+            "condition_occurrence":     result.get("condition_occurrence"),  # NEW
+            "allergies_status":         result.get("allergies_status"),      # NEW
+            "allergy_types":            result.get("allergy_types", []),     # NEW
+            "chronic_conditions":       result.get("chronic_conditions", []),# NEW (list)
+            "on_medication":            result.get("on_medication"),         # NEW
+            "red_flags":                result.get("red_flags", []),
+            "symptom_indicators":       result.get("symptom_indicators", {}),
+            "medications_mentioned":    result.get("medications_mentioned", []),
+            "consents_given":           result.get("consents_given", False),
+            "confidence":               result.get("complaint_group_confidence", 0.85),
         }
 
     def _regex_fallback(self, text: str) -> Dict[str, Any]:
@@ -378,6 +409,7 @@ class APISymptomExtractor:
 
         red_flags = self._regex_red_flags(t)
 
+        # Regex for new fields
         condition_occurrence = None
         if re.search(r"\b(chronic|long.?term|for (months|years)|ongoing|persistent)\b", t):
             condition_occurrence = "long_term"
@@ -411,36 +443,36 @@ class APISymptomExtractor:
             if re.search(pattern, t): chronic_conditions.append(cond)
 
         return {
-            "symptoms":                   [],
-            "severity":                   severity,
-            "severity_confidence":        severity_confidence,
-            "severity_reason":            "regex fallback",
-            "duration":                   duration,
-            "duration_confidence":        0.6 if duration else 0.0,
-            "complaint_group":            complaint_group,
+            "symptoms":                 [],
+            "severity":                 severity,
+            "severity_confidence":      severity_confidence,
+            "severity_reason":          "regex fallback",
+            "duration":                 duration,
+            "duration_confidence":      0.6 if duration else 0.0,
+            "complaint_group":          complaint_group,
             "complaint_group_confidence": complaint_confidence,
-            "age_group":                  age_group,
-            "age_group_confidence":       age_confidence,
-            "sex":                        sex,
-            "pregnancy_status":           None,
-            "patient_relation":           None,
-            "location_raw":               None,
-            "district":                   None,
-            "subcounty":                  None,
-            "village":                    None,
-            "landmark":                   None,
-            "location_confidence":        0.0,
-            "progression_status":         None,
-            "condition_occurrence":       condition_occurrence,
-            "allergies_status":           allergies_status,
-            "allergy_types":              allergy_types,
-            "chronic_conditions":         chronic_conditions,
-            "on_medication":              on_medication,
-            "red_flags":                  red_flags,
-            "symptom_indicators":         {},
-            "medications_mentioned":      [],
-            "consents_given":             False,
-            "confidence":                 0.5,
+            "age_group":                age_group,
+            "age_group_confidence":     age_confidence,
+            "sex":                      sex,
+            "pregnancy_status":         None,
+            "patient_relation":         None,
+            "location_raw":             None,
+            "district":                 None,
+            "subcounty":                None,
+            "village":                  None,
+            "landmark":                 None,
+            "location_confidence":      0.0,
+            "progression_status":       None,
+            "condition_occurrence":     condition_occurrence,
+            "allergies_status":         allergies_status,
+            "allergy_types":            allergy_types,
+            "chronic_conditions":       chronic_conditions,
+            "on_medication":            on_medication,
+            "red_flags":                red_flags,
+            "symptom_indicators":       {},
+            "medications_mentioned":    [],
+            "consents_given":           False,
+            "confidence":               0.5,
         }
 
     def _regex_severity(self, t: str):
@@ -516,33 +548,34 @@ class APISymptomExtractor:
 
 
 # ============================================================================
-# INTELLIGENT QUESTION GENERATION — FREE-TEXT FIELDS ONLY
+# INTELLIGENT QUESTION GENERATION — FULL HISTORY CONTEXT
 # ============================================================================
 
 _QUESTION_SYSTEM = """You are HarakaCare, a friendly WhatsApp medical triage assistant in Uganda.
 
-ARCHITECTURE NOTE: This system uses a hybrid state machine.
-- Structured fields (progression, duration, severity, pregnancy, condition occurrence,
-  allergies, medication, consent) are captured via numbered menus BEFORE this function is called.
-- You only ask about FREE-TEXT fields: complaint description, location, age, sex,
-  and chronic condition details.
-- NEVER ask about fields in "Already captured via menus" or "Already asked about".
+You ask patients for missing information needed to complete their triage assessment.
 
-RULES:
-1. Ask for AT MOST 2 free-text fields per message.
-2. Acknowledge the patient's last message briefly (1 sentence, empathetic).
-3. Keep messages under 60 words — WhatsApp style.
-4. No bullet points, lists, or markdown.
-5. Warm, conversational English. Simple Luganda phrases welcome.
-6. If ANY emergency signs are present → tell them to seek immediate care NOW.
+CRITICAL RULES:
+1. NEVER ask for information that has already been provided — check "What we already know" carefully
+2. Ask for AT MOST 2 missing pieces per message
+3. Acknowledge the patient's last message with empathy before asking
+4. If ANY emergency signs are present → tell them to seek immediate care NOW (no questions)
+5. Keep messages under 60 words — WhatsApp style
+6. Do NOT use bullet points, lists, or markdown
+7. Write in warm, conversational English (or simple Luganda phrases if helpful)
 
-FREE-TEXT fields you may ask about:
-- complaint_group / complaint_text (describe their main symptom)
-- age_group (patient's age)
-- sex (male or female)
-- location / district (which district in Uganda)
-- village (specific village or LC1)
-- chronic_conditions detail (what specific conditions)
+AGE GROUPS: Newborn (0-2 months) / Infant (2-12 months) / Child 1-5 years / Child 6-12 years / Teen (13-17) / Adult (18-64) / Elderly (65+)
+SEVERITY:   Mild (doing normal activities) / Moderate (some difficulty) / Severe (can't do normal activities) / Very severe (can't move or talk)
+DURATION:   Less than 1 hour / 1-6 hours / 6-24 hours / 1-3 days / 4-7 days / More than 1 week / More than 1 month
+PROGRESSION: Sudden onset / Getting worse / Staying the same / Getting better / Comes and goes
+CONDITION OCCURRENCE: First time / Happened before / Long-term/chronic
+ALLERGY STATUS: Yes (state type) / No / Not sure
+
+SPECIAL RULES:
+- If patient is a child (newborn/infant/child_1_5): ask if child can drink/breastfeed normally
+- If patient is female teen or adult: ask about pregnancy if not mentioned
+- If patient mentions chronic condition: ask what medications they take
+- Never ask for location as "country" — ask for district or village in Uganda
 """
 
 
@@ -557,7 +590,7 @@ def generate_followup_questions(
     context              = context or {}
     asked_fields_history = asked_fields_history or set()
 
-    # Emergency override
+    # Emergency override — no questions, immediate advice
     if context.get("red_flags_detected") or intent == "emergency":
         red_flag_list = list((extracted_so_far.get("red_flag_indicators") or {}).keys())
         flag_str = ", ".join(red_flag_list[:2]) if red_flag_list else "danger signs"
@@ -567,26 +600,23 @@ def generate_followup_questions(
             "Do not wait — your life may be at risk."
         )
 
-    # Exclude menu-captured fields and already-asked fields
-    free_text_candidates = [
-        f for f in missing_fields
-        if f not in _MENU_CAPTURED_FIELDS and f not in asked_fields_history
-    ]
-
-    # If nothing left to ask via LLM, return empty (caller handles this)
-    if not free_text_candidates:
-        return ""
-
     priority_order = [
-        "complaint_group", "age_group", "sex", "location", "village", "chronic_conditions",
+        "complaint_group", "severity", "duration", "age_group", "sex",
+        "progression_status", "condition_occurrence", "location", "village",
+        "chronic_conditions", "on_medication", "allergies",
+        "pregnancy_status", "consents",
     ]
-    free_text_candidates.sort(
-        key=lambda f: priority_order.index(f) if f in priority_order else 99
-    )
-    fields_to_ask = free_text_candidates[:2]
 
-    recent = conversation_history[-6:]
-    history_text = "\n".join(f"{t['role'].upper()}: {t['content']}" for t in recent)
+    unasked = [f for f in missing_fields if f not in asked_fields_history]
+    if not unasked:
+        unasked = missing_fields[:1]
+    unasked.sort(key=lambda f: priority_order.index(f) if f in priority_order else 99)
+    fields_to_ask = unasked[:2]
+
+    recent  = conversation_history[-6:]
+    history_text = "\n".join(
+        f"{t['role'].upper()}: {t['content']}" for t in recent
+    )
 
     ei = extracted_so_far
     known_parts = []
@@ -601,51 +631,81 @@ def generate_followup_questions(
         known_parts.append(f"district={ei.get('district') or ei.get('location')}")
     if ei.get("village"):              known_parts.append(f"village={ei['village']}")
     if ei.get("chronic_conditions"):   known_parts.append(f"chronic={ei['chronic_conditions']}")
-    if ei.get("on_medication") is not None: known_parts.append(f"on_medication={ei['on_medication']}")
+    if ei.get("on_medication") is not None:
+        known_parts.append(f"on_medication={ei['on_medication']}")
     if ei.get("allergies_status"):     known_parts.append(f"allergies={ei['allergies_status']}")
     if ei.get("pregnancy_status"):     known_parts.append(f"pregnancy={ei['pregnancy_status']}")
 
-    known_summary  = ", ".join(known_parts) if known_parts else "nothing yet"
-    already_asked  = ", ".join(asked_fields_history) if asked_fields_history else "none"
-    menu_captured  = ", ".join(sorted(_MENU_CAPTURED_FIELDS))
+    known_summary = ", ".join(known_parts) if known_parts else "nothing yet"
 
     field_labels = {
-        "complaint_group":    "what the main problem or symptom is",
-        "age_group":          "the patient's age group",
-        "sex":                "whether the patient is male or female",
-        "location":           "which district they are in Uganda",
-        "village":            "the specific village or LC1 they are in",
-        "chronic_conditions": "which specific long-term health conditions they have",
+        "complaint_group":      "what the main problem or symptom is",
+        "age_group":            "the patient's age group",
+        "sex":                  "whether the patient is male or female",
+        "severity":             "how severe the symptoms are (mild/moderate/severe/very severe)",
+        "duration":             "how long symptoms have lasted",
+        "progression_status":   "whether symptoms are getting better, worse, or staying the same",
+        "condition_occurrence": "whether this is the first time, has happened before, or is a long-term condition",
+        "location":             "which district they are in",
+        "village":              "the specific village or LC1 they are in",
+        "chronic_conditions":   "whether they have any chronic health conditions",
+        "on_medication":        "whether they are currently taking any medication",
+        "allergies":            "whether they have any known allergies",
+        "pregnancy_status":     "whether they are pregnant",
+        "consents":             "consent to medical triage and data sharing",
+        "patient_relation":     "whether this is for themselves or someone else",
     }
+
+    age_group = ei.get("age_group", "")
+    age_specific = ""
+    if age_group in ["newborn", "infant", "child_1_5"]:
+        age_specific = "\nIMPORTANT: Young child — if asking about symptoms, include: can the child drink or breastfeed normally?"
+    elif age_group in ["child_6_12", "teen"]:
+        age_specific = "\nPatient is a child/teen — use child-friendly language."
+
+    pregnancy_note = ""
+    if ei.get("sex") == "female" and age_group in ["teen", "adult"] and not ei.get("pregnancy_status"):
+        pregnancy_note = "\nNote: Patient is female of childbearing age — ask about pregnancy if not yet done."
 
     missing_readable = [field_labels.get(f, f.replace("_", " ")) for f in fields_to_ask]
     missing_str      = " and ".join(missing_readable)
+    already_asked    = ", ".join(asked_fields_history) if asked_fields_history else "none"
 
     user_prompt = f"""Recent conversation:
 {history_text}
 
 What we already know: {known_summary}
 Already asked about: {already_asked}
-Already captured via menus (DO NOT ask): {menu_captured}
 Intent: {intent}
-Free-text fields still needed: {missing_str}
+Fields still needed: {missing_str}{age_specific}{pregnancy_note}
 
 Write ONE WhatsApp reply that:
-1. Briefly acknowledges the last message (empathy if needed, 1 sentence max)
-2. Asks ONLY about the free-text fields listed under "Free-text fields still needed"
-3. Never asks about anything in "What we already know", "Already asked about", or "Already captured via menus"
+1. Briefly acknowledges the last message (empathy if needed, 1 sentence)
+2. Asks ONLY about the fields listed under "Fields still needed"
+3. Do NOT ask about anything already in "What we already know"
+4. Do NOT ask about fields in "Already asked about"
+5. Give answer options where appropriate
 """
 
     raw = _call_llm(_QUESTION_SYSTEM, user_prompt, max_tokens=160)
 
     if not raw:
         fallback_map = {
-            "complaint_group":    "What is the main problem? (fever / breathing / stomach pain / headache / injury / other?)",
-            "age_group":          "What is the patient's age? (Newborn / Infant / Child / Teen / Adult / Elderly?)",
-            "sex":                "Is the patient male or female?",
-            "location":           "Which district in Uganda are you in?",
-            "village":            "What is the name of your village or LC1?",
-            "chronic_conditions": "Please describe your long-term health conditions.",
+            "complaint_group":      "What is the main problem? (fever / breathing / stomach pain / headache / injury / other?)",
+            "age_group":            "What is the patient's age group? (Newborn / Infant / Child 1-5y / Child 6-12y / Teen / Adult / Elderly?)",
+            "sex":                  "Is the patient male or female?",
+            "severity":             "How severe are the symptoms? (Mild / Moderate / Severe / Very severe?)",
+            "duration":             "How long have these symptoms lasted? (Hours / 1-3 days / 4-7 days / More than a week?)",
+            "progression_status":   "Are the symptoms getting better, getting worse, or staying the same?",
+            "condition_occurrence": "Is this the first time, has it happened before, or is it a long-term condition?",
+            "location":             "Which district in Uganda are you in?",
+            "village":              "What is the name of your village or LC1?",
+            "chronic_conditions":   "Do you have any long-term health conditions like diabetes or asthma?",
+            "on_medication":        "Are you currently taking any medication? (Yes / No)",
+            "allergies":            "Do you have any known allergies? (Yes / No / Not sure)",
+            "pregnancy_status":     "Is the patient currently pregnant? (Yes / No / Not applicable)",
+            "consents":             "Do you agree to medical triage and follow-up contact? (Yes / No)",
+            "patient_relation":     "Is this for yourself, your child, or someone else?",
         }
         parts = [fallback_map.get(f, f"Please tell me: {f.replace('_', ' ')}") for f in fields_to_ask]
         return "Thank you for sharing. " + " ".join(parts)
@@ -681,9 +741,9 @@ def detect_emergency_in_text(text: str) -> Dict[str, Any]:
         "cardiac_emergency", "stroke_signs",
     ])
     return {
-        "has_emergency":      len(detected) > 0,
-        "detected_flags":     detected,
-        "requires_immediate": requires_immediate,
+        "has_emergency":       len(detected) > 0,
+        "detected_flags":      detected,
+        "requires_immediate":  requires_immediate,
     }
 
 

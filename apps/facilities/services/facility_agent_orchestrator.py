@@ -77,6 +77,13 @@ class FacilityAgentOrchestrator:
                 recommendation = self.prioritization_tool.get_booking_recommendation(
                     routing, prioritized_candidates
                 )
+
+                # Always auto-assign the top recommended facility so each facility user
+                # sees their incoming cases immediately.
+                if recommendation.get('recommended_facility'):
+                    routing.assigned_facility = recommendation['recommended_facility']
+                    routing.routing_status = FacilityRouting.RoutingStatus.PENDING
+                    routing.save(update_fields=['assigned_facility', 'routing_status', 'updated_at'])
                 
                 # Step 6: Log routing decision
                 self.logging_tool.log_routing_decision(
@@ -304,11 +311,11 @@ class FacilityAgentOrchestrator:
             patient_token=triage_data['patient_token'],
             triage_session_id=triage_data.get('triage_session_id', ''),
             risk_level=triage_data['risk_level'],
-            primary_symptom=triage_data['primary_symptom'],
+            primary_symptom=triage_data.get('primary_symptom') or triage_data.get('complaint_group'),
             secondary_symptoms=triage_data.get('secondary_symptoms', []),
             has_red_flags=triage_data.get('has_red_flags', False),
             chronic_conditions=triage_data.get('chronic_conditions', []),
-            patient_district=triage_data['patient_district'],
+            patient_district=triage_data.get('district', triage_data.get('patient_district', '')),
             patient_location_lat=triage_data.get('patient_location_lat'),
             patient_location_lng=triage_data.get('patient_location_lng'),
         )
@@ -382,8 +389,18 @@ class FacilityAgentOrchestrator:
 
     def _handle_no_facilities(self, routing: FacilityRouting):
         """Handle case when no suitable facilities are found"""
-        routing.routing_status = FacilityRouting.RoutingStatus.CANCELLED
-        routing.save()
+        logger.warning(
+            "No suitable facilities found for routing_id=%s patient_token=%s district=%s risk=%s",
+            routing.id,
+            routing.patient_token,
+            routing.patient_district,
+            routing.risk_level,
+        )
+
+        # Keep the routing in a pending/unassigned state so it can be retried after
+        # facility configuration changes (e.g., district mapping, services catalog).
+        routing.routing_status = FacilityRouting.RoutingStatus.PENDING
+        routing.save(update_fields=['routing_status', 'updated_at'])
         
         self.logging_tool.log_system_event(
             'no_facilities_found',

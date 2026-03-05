@@ -337,8 +337,9 @@ class TriageIntakeSerializer(serializers.Serializer):
                 "Invalid pregnancy status for male patient"
             )
 
-        # Location validation
-        if data.get('location_consent'):
+        # Location validation - only require coordinates if consent explicitly given
+        location_consent = data.get('location_consent')
+        if location_consent is True:
             if not (data.get('device_location_lat') and data.get('device_location_lng')):
                 raise serializers.ValidationError(
                     "Location coordinates required when location consent is given"
