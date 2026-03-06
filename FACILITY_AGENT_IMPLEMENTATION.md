@@ -224,8 +224,10 @@ POST /api/facilities/agent/update_capacity/
 ```bash
 FACILITY_API_KEY=your_api_key_here
 DEBUG=True/False
-DATABASE_URL=postgresql://...
+DATABASE_URL=postgresql://user:password@localhost:5432/dbname
 ```
+
+**Note**: Never commit actual API keys or passwords to version control. Use environment variables in production.
 
 ### Dependencies
 - **Django REST Framework**: API development

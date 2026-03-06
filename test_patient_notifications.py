@@ -7,8 +7,8 @@ import os
 import sys
 import django
 
-# Setup Django
-sys.path.append('/home/medisoft/Desktop/harakacare')
+# Setup Django - use relative path for portability
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'harakacare.settings.development')
 django.setup()
 
