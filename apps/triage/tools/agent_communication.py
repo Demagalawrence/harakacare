@@ -1,3 +1,4 @@
+
 """
 Tool 8: Agent Communication Tool
 Handles communication with other agents in the system
@@ -94,17 +95,10 @@ class AgentCommunicationTool:
             red_flag_result: Dict[str, Any]
     ) -> Dict[str, Any]:
         """
-        Forward case to Facility Matching Agent
-
-        Args:
-            session: TriageSession instance
-            decision: Final triage decision
-            red_flag_result: Red flag detection results
-
-        Returns:
-            Communication result
+        Forward case to Facility Matching Agent.
+        Now calls FacilityBridge directly instead of just logging a TODO.
         """
-        # Build payload for Facility Matching Agent
+        # Build payload for logging / audit
         payload = {
             'patient_token': session.patient_token,
             'risk_level': decision['risk_level'],
@@ -123,7 +117,7 @@ class AgentCommunicationTool:
             'pregnancy_status': session.pregnancy_status
         }
 
-        # Log communication
+        # Log communication intent
         from apps.triage.models import AgentCommunicationLog
 
         comm_log = AgentCommunicationLog.objects.create(
@@ -134,22 +128,30 @@ class AgentCommunicationTool:
         )
 
         try:
-            # TODO: Implement actual API call to Facility Matching Agent
-            # For now, just log
-            logger.info(
-                f"Would forward to Facility Matching Agent: {session.patient_token} "
-                f"- Facility type: {decision['facility_type']}"
+            # ── Real call to the Facility Bridge ────────────────────────────
+            from apps.triage.services.facility_bridge import dispatch as facility_dispatch
+            bridge_result = facility_dispatch(
+                session=session,
+                decision=decision,
+                red_flag_result=red_flag_result,
             )
 
-            # Update communication log
             comm_log.communication_status = 'sent'
             comm_log.save()
 
+            logger.info(
+                "Facility bridge dispatched for %s — facility=%s booking=%s",
+                session.patient_token[:8],
+                bridge_result.get('assigned_facility'),
+                bridge_result.get('booking_type'),
+            )
+
             return {
-                'success': True,
+                'success': bridge_result.get('success', False),
                 'agent': 'facility_matching',
-                'message': 'Case forwarded to Facility Matching Agent',
-                'payload': payload
+                'message': 'Case forwarded to Facility Agent',
+                'payload': payload,
+                'bridge_result': bridge_result,
             }
 
         except Exception as e:

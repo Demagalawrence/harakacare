@@ -816,15 +816,39 @@ class ConversationalIntakeAgent:
         return None
 
     def _extract_location(self, text: str) -> Tuple[Optional[str], Optional[str], Optional[str], Optional[str]]:
+        """
+        Returns (location, district, subcounty, village).
+        Tries to extract BOTH district and village from the same message so
+        that coordinate lookup works (it requires both fields).
+        """
         t = text.lower()
+
+        # Find district
+        found_district = None
         for district in UGANDAN_DISTRICTS:
             if district in t:
-                return district.title(), district.title(), None, None
-        village_match = re.search(r"\b(in|at)\s+([a-z\s]+?)\s*(village|lc1|parish)\b", t)
+                found_district = district.title()
+                break
+
+        # Find village / LC1 / parish pattern
+        found_village = None
+        village_match = re.search(r"\b(in|at|from)\s+([a-z][a-z\s]{1,30}?)\s*(village|lc1|parish|ward)\b", t)
         if village_match:
-            village = village_match.group(2).strip().title()
-            return village, None, None, village
-        return None, None, None, None
+            found_village = village_match.group(2).strip().title()
+
+        # Also try "VillageName, District" or "VillageName District" patterns
+        if not found_village and not found_district:
+            # Generic two-word location guess: "in Nakawa Kampala"
+            generic = re.search(r"\b(in|at|from)\s+([a-z]+)\s+([a-z]+)\b", t)
+            if generic:
+                # Heuristic: if second word is a known district use it
+                candidate = generic.group(3)
+                if candidate in UGANDAN_DISTRICTS:
+                    found_district = candidate.title()
+                    found_village  = generic.group(2).title()
+
+        location = found_district or found_village
+        return location, found_district, None, found_village
 
     def _extract_chronic_conditions(self, text: str) -> Tuple[List[str], bool]:
         t = text.lower()
@@ -1379,11 +1403,16 @@ class ConversationalIntakeAgent:
 # CONVENIENCE FUNCTIONS
 # ============================================================================
 
-def process_conversational_intake(patient_token: str, text: str) -> Dict[str, Any]:
-    return IntakeValidationTool().process_intake(patient_token, text)
+def process_conversational_intake(patient_token: str, text: str, conversation_id: str = None) -> Dict[str, Any]:
+    """
+    Public helper used by messaging/services.py.
+    Delegates to ConversationalIntakeAgent — start or continue based on conversation_id.
+    """
+    agent = ConversationalIntakeAgent()
+    if conversation_id:
+        return agent.continue_conversation(token=patient_token, message=text)
+    return agent.start_conversation(token=patient_token, message=text)
 
 
 def validate_structured_intake(data: Dict[str, Any]) -> Tuple[bool, Dict[str, Any], List[str]]:
     return IntakeValidationTool().validate(data)
-
-    

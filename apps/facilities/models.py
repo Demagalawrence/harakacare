@@ -1,9 +1,6 @@
 from django.db import models
-from django.conf import settings
 from django.core.validators import MinValueValidator, MaxValueValidator
-
-# Import patient notification models
-from .models_patient_notifications import PatientNotification, PatientNotificationPreference
+from django.contrib.auth.models import User
 
 
 # Create your models here.
@@ -24,6 +21,14 @@ class Facility(models.Model):
         ('specialty_center', 'Specialty Center'),
         ('diagnostic_center', 'Diagnostic Center'),
     ]
+    
+    # Link to Django user account
+    user = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE,
+        related_name='facility',
+        help_text='Django user account linked to this facility'
+    )
     
     name = models.CharField(
         'facility name',
@@ -49,9 +54,10 @@ class Facility(models.Model):
         max_length=100,
         blank=True,
         default='',
+        db_index=True,
         help_text='Administrative district where the facility is located'
     )
-    
+
     phone_number = models.CharField(
         'phone number',
         max_length=20,
@@ -134,14 +140,6 @@ class Facility(models.Model):
         default='',
         help_text='API endpoint for receiving notifications'
     )
-
-    user = models.OneToOneField(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='facility_profile'
-    )
     
     # Status
     is_active = models.BooleanField(
@@ -168,7 +166,6 @@ class Facility(models.Model):
             models.Index(fields=['facility_type']),
             models.Index(fields=['is_active']),
             models.Index(fields=['latitude', 'longitude']),
-            models.Index(fields=['district']),
         ]
     
     def __str__(self):
@@ -185,8 +182,14 @@ class Facility(models.Model):
         return service in self.services_offered
     
     def can_handle_emergency(self):
-        """Check if facility can handle emergency cases"""
-        return self.ambulance_available and self.offers_service('emergency')
+        """
+        Check if facility can handle emergency cases.
+        An emergency service flag OR being a hospital/urgent_care type is sufficient
+        — having an ambulance is a bonus, not a hard requirement.
+        """
+        has_emergency_service = self.offers_service('emergency')
+        is_hospital_level     = self.facility_type in ('hospital', 'urgent_care')
+        return has_emergency_service or is_hospital_level
     
     def distance_to(self, lat, lng):
         """Calculate distance to given coordinates using Haversine formula"""
@@ -288,6 +291,37 @@ class FacilityRouting(models.Model):
         help_text='Chronic conditions from triage'
     )
 
+    # Patient demographic information
+    age_group = models.CharField(
+        'age group',
+        max_length=20,
+        choices=[
+            ('newborn', 'Newborn (0-2 months)'),
+            ('infant', 'Infant (2-12 months)'),
+            ('child_1_5', 'Child (1-5 years)'),
+            ('child_6_12', 'Child (6-12 years)'),
+            ('teen', 'Teen (13-17 years)'),
+            ('adult', 'Adult (18-64 years)'),
+            ('elderly', 'Elderly (65+ years)'),
+        ],
+        null=True,
+        blank=True,
+        help_text='Patient age group from triage'
+    )
+
+    sex = models.CharField(
+        'sex',
+        max_length=20,
+        choices=[
+            ('male', 'Male'),
+            ('female', 'Female'),
+            ('other', 'Other / Prefer not to say'),
+        ],
+        null=True,
+        blank=True,
+        help_text='Patient sex from triage'
+    )
+
     # Location information
     patient_village = models.CharField(
         'patient village',
@@ -300,7 +334,9 @@ class FacilityRouting(models.Model):
     patient_district = models.CharField(
         'patient district',
         max_length=100,
-        help_text='Patient district/area'
+        null=True,
+        blank=True,
+        help_text='Patient district/area from triage'
     )
 
     patient_location_lat = models.FloatField(

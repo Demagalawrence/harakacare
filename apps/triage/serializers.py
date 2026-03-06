@@ -15,6 +15,27 @@ from apps.triage.models import (
 )
 
 
+class TriageSessionStatusSerializer(serializers.ModelSerializer):
+    """Serializer for triage session status tracking"""
+    class Meta:
+        model = TriageSession
+        fields = [
+            'patient_token',
+            'risk_level',
+            'complaint_group',
+            'age_group',
+            'sex',
+            'session_status',
+            'assessment_completed_at',
+            'facility_assignment_status',
+            'facility_name',
+            'facility_response_timestamp',
+            'created_at',
+            'updated_at'
+        ]
+        read_only_fields = fields
+
+
 class TriageIntakeSerializer(serializers.Serializer):
     """
     Serializer for triage intake data submission - UPDATED
@@ -337,9 +358,8 @@ class TriageIntakeSerializer(serializers.Serializer):
                 "Invalid pregnancy status for male patient"
             )
 
-        # Location validation - only require coordinates if consent explicitly given
-        location_consent = data.get('location_consent')
-        if location_consent is True:
+        # Location validation
+        if data.get('location_consent'):
             if not (data.get('device_location_lat') and data.get('device_location_lng')):
                 raise serializers.ValidationError(
                     "Location coordinates required when location consent is given"

@@ -339,10 +339,9 @@ class LoggingMonitoringTool:
     def _calculate_emergency_response_rate(self, start_date: datetime, end_date: datetime) -> float:
         """Calculate emergency response rate"""
         emergency_routings = FacilityRouting.objects.filter(
+            Q(risk_level='high') | Q(has_red_flags=True),
             triage_received_at__gte=start_date,
-            triage_received_at__lte=end_date
-        ).filter(
-            Q(risk_level='high') | Q(has_red_flags=True)
+            triage_received_at__lte=end_date,
         )
         
         total_emergency = emergency_routings.count()

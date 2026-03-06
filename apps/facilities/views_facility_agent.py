@@ -20,7 +20,6 @@ from .tools.facility_matching import FacilityMatchingTool
 from .tools.prioritization import PrioritizationTool
 from .tools.notification_dispatch import NotificationDispatchTool
 from .tools.logging_monitoring import LoggingMonitoringTool
-from .tools.patient_notification_service import PatientNotificationService
 from .serializers_facility_agent import (
     FacilityRoutingSerializer, FacilityCandidateSerializer,
     FacilityNotificationSerializer, FacilityCapacityLogSerializer,
@@ -200,32 +199,10 @@ class FacilityAgentViewSet(viewsets.ModelViewSet):
             routing.routing_status = FacilityRouting.RoutingStatus.CONFIRMED
             routing.facility_confirmed_at = timezone.now()
             
-            # Send notification to patient
-            patient_notification_service = PatientNotificationService()
-            patient_notification = patient_notification_service.send_facility_confirmation_notification(
-                routing=routing,
-                facility=facility,
-                beds_reserved=response_data.get('beds_reserved', 0),
-                additional_info={
-                    'estimated_wait_time': response_data.get('estimated_wait_time'),
-                    'directions': response_data.get('directions'),
-                    'special_instructions': response_data.get('special_instructions'),
-                }
-            )
-            
             # Update facility capacity
             if response_data.get('beds_reserved', 0) > 0:
                 facility = notification.facility
                 facility.update_capacity(-response_data['beds_reserved'])
-                
-                # Send bed reservation notification if beds were reserved
-                if response_data.get('beds_reserved', 0) > 0:
-                    patient_notification_service.send_bed_reservation_notification(
-                        routing=routing,
-                        facility=facility,
-                        bed_count=response_data['beds_reserved'],
-                        room_info=response_data.get('room_info')
-                    )
                 
                 # Log capacity change
                 logging_tool = LoggingMonitoringTool()
@@ -240,27 +217,8 @@ class FacilityAgentViewSet(viewsets.ModelViewSet):
             notification.notification_status = FacilityRouting.RoutingStatus.REJECTED
             routing.routing_status = FacilityRouting.RoutingStatus.REJECTED
             
-            # Send rejection notification to patient
-            patient_notification_service = PatientNotificationService()
-            rejection_reason = response_data.get('reason', 'Facility at capacity')
-            
-            patient_notification_service.send_facility_rejection_notification(
-                routing=routing,
-                facility=facility,
-                rejection_reason=rejection_reason,
-                alternative_facility=None  # Will be updated if alternative found
-            )
-            
             # Try next facility if available
-            alternative_facility = self._try_alternative_facility(routing)
-            
-            # If alternative facility found, send notification about it
-            if alternative_facility:
-                patient_notification_service.send_alternative_facility_notification(
-                    routing=routing,
-                    new_facility=alternative_facility,
-                    reason_for_change=f"{facility.name} was unable to accept your case: {rejection_reason}"
-                )
+            self._try_alternative_facility(routing)
         
         notification.save()
         routing.save()
@@ -292,10 +250,6 @@ class FacilityAgentViewSet(viewsets.ModelViewSet):
             notification_tool.send_case_notification(
                 routing, next_candidate.facility
             )
-            
-            return next_candidate.facility
-        
-        return None
     
     @action(detail=False, methods=['get'])
     def statistics(self, request):

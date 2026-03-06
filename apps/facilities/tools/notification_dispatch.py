@@ -26,7 +26,7 @@ class NotificationDispatchTool:
     Tool for dispatching notifications to healthcare facilities
     Handles multiple notification methods and tracks delivery status
     """
-
+    
     def __init__(self):
         self.max_retries = 3
         self.timeout_seconds = 30
@@ -182,7 +182,7 @@ class NotificationDispatchTool:
 
     def _send_via_sms(self, notification: FacilityNotification) -> bool:
         """
-        Send notification via SMS (placeholder implementation)
+        Send notification via SMS using Africa's Talking
         
         Args:
             notification: FacilityNotification to send
@@ -190,10 +190,30 @@ class NotificationDispatchTool:
         Returns:
             True if successful, False otherwise
         """
-        # This would integrate with SMS service like Twilio, Africa's Talking, etc.
-        # For now, return False to indicate not implemented
-        notification.error_message = "SMS notification not implemented"
-        return False
+        try:
+            from apps.channels.sms import send_sms
+            
+            facility = notification.facility
+            if not facility.phone_number:
+                notification.error_message = "No phone number configured for facility"
+                return False
+            
+            # Format the message for SMS
+            message = f"HARAKACARE ALERT: New patient case\n\n{notification.message}"
+            
+            # Send SMS
+            success = send_sms(facility.phone_number, message)
+            
+            if success:
+                notification.response_received_at = timezone.now()
+                return True
+            else:
+                notification.error_message = "SMS delivery failed"
+                return False
+                
+        except Exception as e:
+            notification.error_message = f"SMS error: {str(e)}"
+            return False
 
     def _generate_subject(self, routing: FacilityRouting, notification_type: str) -> str:
         """Generate notification subject"""
@@ -491,3 +511,78 @@ Case ID: {notification.routing.id}
             count = queryset.filter(notification_type=type_name).count()
             breakdown[type_name] = count
         return breakdown
+
+    def retry_failed_notifications(self) -> int:
+        """Retry failed notifications"""
+        failed_notifications = FacilityNotification.objects.filter(
+            notification_status=FacilityNotification.NotificationStatus.FAILED,
+            retry_count__lt=self.max_retries
+        )
+        
+        retried_count = 0
+        for notification in failed_notifications:
+            try:
+                success = self._dispatch_notification(notification)
+                if success:
+                    notification.notification_status = FacilityNotification.NotificationStatus.SENT
+                    notification.sent_at = timezone.now()
+                    notification.retry_count += 1
+                    notification.save()
+                    retried_count += 1
+                    logger.info(f"Successfully retried notification to {notification.facility.name}")
+            except Exception as e:
+                notification.retry_count += 1
+                notification.error_message = f"Retry failed: {str(e)}"
+                notification.save()
+                logger.error(f"Retry failed for {notification.facility.name}: {e}")
+        
+        return retried_count
+
+    def check_pending_acknowledgments(self) -> List[FacilityNotification]:
+        """Check for notifications pending acknowledgment too long"""
+        cutoff_time = timezone.now() - timedelta(hours=2)  # 2 hour timeout
+        pending_notifications = FacilityNotification.objects.filter(
+            notification_status=FacilityNotification.NotificationStatus.SENT,
+            sent_at__lt=cutoff_time,
+            response_received_at__isnull=True
+        )
+        return list(pending_notifications)
+
+    def send_follow_up_reminder(self, notification: FacilityNotification) -> bool:
+        """Send follow-up reminder for pending notification"""
+        try:
+            reminder_message = f"FOLLOW-UP REMINDER: Case {notification.routing.patient_token[:8]} pending acknowledgment"
+            
+            if notification.facility.notification_endpoint:
+                # Send API reminder
+                payload = {
+                    'type': 'follow_up_reminder',
+                    'original_notification_id': notification.id,
+                    'message': reminder_message,
+                    'patient_token': notification.routing.patient_token[:8],
+                    'urgency': 'high' if notification.routing.risk_level == 'high' else 'medium'
+                }
+                
+                response = self.session.post(
+                    notification.facility.notification_endpoint,
+                    json=payload,
+                    timeout=self.timeout_seconds
+                )
+                
+                if response.status_code == 200:
+                    logger.info(f"Follow-up reminder sent to {notification.facility.name}")
+                    return True
+            
+            elif notification.facility.phone_number:
+                # Send SMS reminder
+                from apps.channels.sms import send_sms
+                success = send_sms(notification.facility.phone_number, reminder_message)
+                if success:
+                    logger.info(f"SMS follow-up sent to {notification.facility.name}")
+                    return True
+            
+            return False
+            
+        except Exception as e:
+            logger.error(f"Failed to send follow-up reminder to {notification.facility.name}: {e}")
+            return False

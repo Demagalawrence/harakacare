@@ -140,6 +140,15 @@ class TriageSession(StatusModel):
         help_text=_('Who is the patient?')
     )
 
+    # Patient phone number for notifications
+    patient_phone_number = models.CharField(
+        _('patient phone number'),
+        max_length=20,
+        null=True,
+        blank=True,
+        help_text=_('Patient phone number for WhatsApp/SMS notifications')
+    )
+
     # ========================================================================
     # STRUCTURED SYMPTOM INDICATORS (from adaptive questions)
     # ========================================================================
@@ -317,6 +326,39 @@ class TriageSession(StatusModel):
         _('location consent'),
         default=False,
         help_text=_('Whether patient consented to share device location')
+    )
+
+    # Geocoding metadata
+    geocoding_display_name = models.CharField(
+        _('geocoding display name'),
+        max_length=500,
+        null=True,
+        blank=True,
+        default='',
+        help_text=_("Human-readable resolved address, e.g. 'Bwaise, Kawempe, Kampala, Uganda'")
+    )
+
+    geocoding_accuracy = models.CharField(
+        _('geocoding accuracy'),
+        max_length=50,
+        null=True,
+        blank=True,
+        help_text=_('Spatial precision of geocoded coordinates')
+    )
+
+    geocoding_confidence = models.FloatField(
+        _('geocoding confidence'),
+        null=True,
+        blank=True,
+        help_text=_('Geocoder confidence score (0.0 = unknown, 1.0 = exact match)')
+    )
+
+    geocoding_source = models.CharField(
+        _('geocoding source'),
+        max_length=50,
+        null=True,
+        blank=True,
+        help_text=_('How coordinates were obtained. Null = not yet geocoded')
     )
 
     # ========================================================================

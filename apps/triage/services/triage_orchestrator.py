@@ -344,6 +344,33 @@ class TriageOrchestrator:
         print(f"   Conversation turns: {session.conversation_turns}")
         print("="*70 + "\n")
 
+        # ====================================================================
+        # STEP 8: AUTO-DISPATCH TO FACILITY AGENT
+        # Triggers for every completed triage (low / medium / high).
+        # The bridge finds the nearest capable hospital, books automatically
+        # for high-risk cases, and sends a confirmation to the patient.
+        # ====================================================================
+        try:
+            from apps.triage.services.facility_bridge import dispatch as facility_dispatch
+            bridge_result = facility_dispatch(
+                session=session,
+                decision=final_decision,
+                red_flag_result=red_flag_result,
+            )
+            print(f"🏥 FACILITY DISPATCH - success={bridge_result.get('success')} "
+                  f"facility={bridge_result.get('assigned_facility')} "
+                  f"booking={bridge_result.get('booking_type')}")
+            # Attach bridge result so callers (messaging layer) can use the message
+            final_decision['facility_assignment'] = bridge_result
+            # Mark session as forwarded if dispatch succeeded
+            if bridge_result.get('success'):
+                session.forwarded_to_facility = True
+                session.save(update_fields=['forwarded_to_facility'])
+        except Exception as e:
+            # Never let facility dispatch crash the triage response
+            print(f"⚠️  Facility dispatch error (non-fatal): {e}")
+            logger.warning("Facility bridge error for %s: %s", patient_token, e)
+
         return session, final_decision, red_flag_result
 
     @staticmethod

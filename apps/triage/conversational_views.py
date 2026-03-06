@@ -11,10 +11,7 @@ from drf_spectacular.utils import extend_schema
 from rest_framework import serializers
 from apps.triage.tools.intake_validation import IntakeValidationTool
 from apps.triage.services.triage_orchestrator import TriageOrchestrator
-from apps.triage.tools.conversational_intake_agent import (
-    IntakeValidationTool,
-    process_conversational_intake
-)
+from apps.triage.tools.conversational_intake_agent import ConversationalIntakeAgent
 
 
 # ============================================================================
@@ -217,23 +214,18 @@ class ConversationalTriageView(views.APIView):
             print(f"🆕 STARTING new conversation with token: {patient_token}")
         
         try:
-            # Create intake tool
-            tool = IntakeValidationTool()
-            
-            # Process with conversational agent
+            # Use ConversationalIntakeAgent — the class that actually has these methods
+            agent = ConversationalIntakeAgent()
+
             if conversation_id:
-                print(f"   Calling process_intake with conversation_id={conversation_id}")
-                result = tool.process_intake(
-                    patient_token=patient_token,
-                    free_text=message,
-                    conversation_id=conversation_id  # This triggers continue_conversation
-                )
+                print(f"   Calling continue_conversation for token={patient_token}")
+                result = agent.continue_conversation(token=patient_token, message=message)
             else:
-                print(f"   Calling process_intake without conversation_id (new conversation)")
-                result = tool.process_intake(
-                    patient_token=patient_token,
-                    free_text=message
-                )
+                print(f"   Calling start_conversation for token={patient_token}")
+                result = agent.start_conversation(token=patient_token, message=message)
+
+            # Ensure patient_token is in result (some paths omit it)
+            result.setdefault('patient_token', patient_token)
             
             # Add channel to result
             result['channel'] = channel
@@ -499,13 +491,10 @@ class HybridTriageView(views.APIView):
             
             print(f"   Conversational mode: {message[:50]}...")
             
-            # Use the token from URL
-            tool = IntakeValidationTool()
-            result = tool.process_intake(
-                patient_token=patient_token,
-                free_text=message,
-                conversation_id=patient_token  # Use token as conversation_id
-            )
+            # Use the token from URL — continue existing conversation
+            agent = ConversationalIntakeAgent()
+            result = agent.continue_conversation(token=patient_token, message=message)
+            result.setdefault('patient_token', patient_token)
             
             # If complete, auto-submit to triage
             if result.get('status') == 'complete':
@@ -676,4 +665,3 @@ Response (Immediate):
     }
 }
 """
-

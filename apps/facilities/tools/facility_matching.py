@@ -6,6 +6,7 @@ Based on: HarakaCare Facility Agent Data Requirements - Tool 4.2
 
 from typing import List, Dict, Tuple, Optional
 from django.db.models import Q, F, FloatField
+from django.db import models
 from django.db.models.functions import Cast
 from ..models import (
     Facility, FacilityCandidate, FacilityRouting
@@ -41,50 +42,51 @@ class FacilityMatchingTool:
         Returns:
             List of FacilityCandidate objects sorted by match score
         """
-        # Base facility query
-        facilities = Facility.objects.filter(is_active=True)
-        
-        # Filter by location (same village first, then same district, then nearby)
-        village_value = (routing.patient_village or '').strip()
-        district_value = (routing.patient_district or '').strip()
-        
-        if village_value:
-            # Priority 1: Same village (exact match)
-            village_facilities = facilities.filter(
-                Q(address__icontains=village_value) | Q(district__icontains=village_value)
-            )
-        elif district_value:
-            # Priority 2: Same district
-            district_facilities = facilities.filter(
-                Q(district__iexact=district_value) | Q(address__icontains=district_value)
-            )
-            village_facilities = facilities.none()
-        else:
-            village_facilities = facilities.none()
-            district_facilities = facilities.none()
-            
-        nearby_facilities = self._find_nearby_facilities(routing, exclude=village_facilities | district_facilities)
-        
-        # Combine results (village + district + nearby)
-        all_facilities = (village_facilities | district_facilities | nearby_facilities).distinct()
-        
-        # Score and rank facilities
-        candidates = []
-        for facility in all_facilities[:max_candidates * 2]:  # Get more to filter
-            score_data = self._calculate_match_score(facility, routing)
-            # Always allow same-district facilities through (important when coordinates or
-            # service catalogs are missing in development data).
-            is_same_district = False
-            try:
-                is_same_district = bool(
-                    routing.patient_district
-                    and facility.district
-                    and facility.district.strip().lower() == routing.patient_district.strip().lower()
-                )
-            except Exception:
-                is_same_district = False
+        all_facilities = Facility.objects.filter(is_active=True)
 
-            if score_data['score'] > 0.1 or is_same_district:  # Minimum threshold
+        # ── 1. District match (uses dedicated field + address fallback) ────────
+        district_facilities = all_facilities.none()
+        if routing.patient_district:
+            district_facilities = all_facilities.filter(
+                models.Q(district__iexact=routing.patient_district) |
+                models.Q(district__icontains=routing.patient_district) |
+                models.Q(address__icontains=routing.patient_district)
+            )
+
+        # ── 2. GPS bounding-box match ─────────────────────────────────────────
+        nearby_facilities = self._find_nearby_facilities(routing, exclude=district_facilities)
+
+        # ── 3. Combine ────────────────────────────────────────────────────────
+        combined = (district_facilities | nearby_facilities).distinct()
+
+        # ── 3.5. Emergency Block (Hard Filter) ─────────────────────────────
+        if routing.is_emergency or routing.risk_level == 'high' or routing.has_red_flags:
+            # For emergencies: ONLY include facilities that can handle emergencies
+            combined = combined.filter(ambulance_available=True)
+            import logging
+            logging.getLogger(__name__).info(
+                f"Emergency block applied: filtered to {combined.count()} emergency-capable facilities for {routing.patient_token}"
+            )
+
+        # ── 4. Fallback: if NOTHING matched by district or GPS, score all ─────
+        # This handles manually-entered facilities that lack a district/GPS field.
+        if not combined.exists():
+            combined = all_facilities
+            import logging
+            logging.getLogger(__name__).warning(
+                "FacilityMatching: no district/GPS match for district=%r lat=%s lng=%s "
+                "— falling back to all %d active facilities",
+                routing.patient_district,
+                routing.patient_location_lat,
+                routing.patient_location_lng,
+                combined.count(),
+            )
+
+        # ── 5. Score and rank ─────────────────────────────────────────────────
+        candidates = []
+        for facility in combined[:max_candidates * 2]:
+            score_data = self._calculate_match_score(facility, routing)
+            if score_data['score'] > 0.05:  # lowered threshold so partial-data facilities still appear
                 candidate = FacilityCandidate(
                     routing=routing,
                     facility=facility,
@@ -96,8 +98,7 @@ class FacilityMatchingTool:
                     selection_reason=score_data['reason']
                 )
                 candidates.append(candidate)
-        
-        # Sort by score and return top candidates
+
         candidates.sort(key=lambda x: x.match_score, reverse=True)
         return candidates[:max_candidates]
 
@@ -114,16 +115,20 @@ class FacilityMatchingTool:
             List of nearby facilities
         """
         if not routing.patient_location_lat or not routing.patient_location_lng:
+            # No GPS — return empty so district text-search is still tried
             return Facility.objects.none()
-        
+
         facilities = Facility.objects.filter(is_active=True)
-        
+
         if exclude:
             facilities = facilities.exclude(id__in=exclude.values_list('id', flat=True))
-        
-        # Filter by coordinates (simplified bounding box)
-        lat_delta = max_distance_km / 111.0  # Approximate km per degree latitude
-        lng_delta = max_distance_km / (111.0 * abs(routing.patient_location_lat))
+
+        # Bounding-box pre-filter before Haversine scoring.
+        # Guard against division-by-zero near the equator (Uganda spans ~4S-4N).
+        from math import cos, radians
+        lat_delta = max_distance_km / 111.0
+        cos_lat   = max(cos(radians(routing.patient_location_lat)), 0.01)
+        lng_delta = max_distance_km / (111.0 * cos_lat)
         
         facilities = facilities.filter(
             latitude__isnull=False,
@@ -154,13 +159,10 @@ class FacilityMatchingTool:
         score = 0.0
         factors = []
         
-        # 1. Distance score (0-0.3) - handle missing coordinates
-        if routing.patient_location_lat and routing.patient_location_lng:
-            distance = facility.distance_to(routing.patient_location_lat, routing.patient_location_lng)
-        else:
-            distance = None
+        # 1. Distance score (0-0.5)
+        distance = facility.distance_to(routing.patient_location_lat, routing.patient_location_lng)
         distance_score = self._calculate_distance_score(distance)
-        score += distance_score * 0.3
+        score += distance_score * 0.5
         factors.append(f"Distance: {distance_score:.2f}")
         
         # 2. Capacity score (0-0.25)
@@ -173,16 +175,16 @@ class FacilityMatchingTool:
         score += service_score * 0.25
         factors.append(f"Services: {service_score:.2f}")
         
-        # 4. Facility type score (0-0.1)
-        type_score = self._calculate_facility_type_score(facility, routing)
-        score += type_score * 0.1
-        factors.append(f"Type: {type_score:.2f}")
-        
-        # 5. Emergency capability score (0-0.1)
+        # 4. Emergency capability score (0-0.2)
         emergency_score = self._calculate_emergency_score(facility, routing)
-        score += emergency_score * 0.1
+        score += emergency_score * 0.2
         factors.append(f"Emergency: {emergency_score:.2f}")
         
+        # 5. Wait time score (0-0.05) — penalise long queues for urgent cases
+        wait_score = self._calculate_wait_time_score(facility, routing)
+        score += wait_score * 0.05
+        factors.append(f"Wait: {wait_score:.2f}")
+
         # Determine if facility can handle the case
         has_capacity = facility.has_capacity()
         offers_service = self._offers_required_services(facility, routing)
@@ -257,27 +259,6 @@ class FacilityMatchingTool:
         else:
             return 0.3
 
-    def _calculate_facility_type_score(self, facility: Facility, routing: FacilityRouting) -> float:
-        """Calculate facility type preference score"""
-        type_scores = {
-            'hospital': 1.0,
-            'urgent_care': 0.9,
-            'clinic': 0.7,
-            'specialty_center': 0.8,
-            'diagnostic_center': 0.5,
-            'pharmacy': 0.3,
-            'laboratory': 0.3,
-        }
-        
-        base_score = type_scores.get(facility.facility_type, 0.5)
-        
-        # Boost for emergency cases
-        if routing.is_emergency:
-            if facility.facility_type in ['hospital', 'urgent_care']:
-                base_score = min(base_score * 1.2, 1.0)
-        
-        return base_score
-
     def _calculate_emergency_score(self, facility: Facility, routing: FacilityRouting) -> float:
         """Calculate emergency handling score"""
         if not routing.is_emergency:
@@ -290,24 +271,56 @@ class FacilityMatchingTool:
         else:
             return 0.2
 
+    def _calculate_wait_time_score(self, facility: Facility, routing: FacilityRouting) -> float:
+        """Score based on wait time — only penalises for urgent/emergency cases"""
+        wait = facility.average_wait_time_minutes
+        if wait is None:
+            return 0.7  # Unknown — neutral
+
+        is_urgent = getattr(routing, 'is_emergency', False) or routing.risk_level in ('high',)
+
+        if not is_urgent:
+            return 1.0  # Wait time irrelevant for low/medium routine cases
+
+        # For urgent cases shorter wait = better
+        if wait <= 15:
+            return 1.0
+        elif wait <= 30:
+            return 0.8
+        elif wait <= 60:
+            return 0.5
+        elif wait <= 120:
+            return 0.3
+        else:
+            return 0.1
+
     def _get_required_services(self, routing: FacilityRouting) -> List[str]:
         """Determine required services based on symptoms and conditions"""
         services = ['general_medicine']  # Default requirement
         
-        # Map symptoms to services
+        # Map symptoms/complaint_groups to required services.
+        # Covers BOTH legacy primary_symptom keys and new complaint_group values.
         symptom_service_map = {
-            'chest_pain': ['emergency', 'general_medicine'],
-            'difficulty_breathing': ['emergency', 'general_medicine'],
-            'abdominal_pain': ['general_medicine', 'surgery'],
-            'injury_trauma': ['emergency', 'surgery'],
-            'fever': ['general_medicine'],
-            'headache': ['general_medicine'],
-            'vomiting': ['general_medicine'],
-            'diarrhea': ['general_medicine'],
-            'skin_problem': ['general_medicine', 'diagnostics'],
-            # Complaint-group values used by the triage system
-            'pregnancy': ['obstetrics'],
+            # ── new complaint_group values ───────────────────────────────
+            'breathing':     ['emergency', 'general_medicine'],
+            'chest_pain':    ['emergency', 'general_medicine'],
+            'injury':        ['emergency', 'surgery'],
+            'abdominal':     ['general_medicine', 'surgery'],
+            'headache':      ['general_medicine'],
+            'fever':         ['general_medicine'],
+            'pregnancy':     ['obstetrics'],
+            'skin':          ['general_medicine', 'diagnostics'],
+            'feeding':       ['general_medicine', 'pediatrics'],
+            'bleeding':      ['emergency', 'surgery'],
             'mental_health': ['mental_health'],
+            'other':         ['general_medicine'],
+            # ── legacy primary_symptom keys (backward compat) ───────────
+            'difficulty_breathing': ['emergency', 'general_medicine'],
+            'abdominal_pain':       ['general_medicine', 'surgery'],
+            'injury_trauma':        ['emergency', 'surgery'],
+            'vomiting':             ['general_medicine'],
+            'diarrhea':             ['general_medicine'],
+            'skin_problem':         ['general_medicine', 'diagnostics'],
         }
         
         primary_service = symptom_service_map.get(routing.primary_symptom, ['general_medicine'])
@@ -333,12 +346,7 @@ class FacilityMatchingTool:
         """Check if facility offers required services"""
         required_services = self._get_required_services(routing)
         offered_services = facility.services_offered or []
-
-        # If a facility hasn't been configured with a service catalog yet,
-        # treat it as a general provider in development.
-        if not offered_services:
-            return True
-
+        
         return any(service in offered_services for service in required_services)
 
     def get_best_match(self, routing: FacilityRouting) -> Optional[FacilityCandidate]:

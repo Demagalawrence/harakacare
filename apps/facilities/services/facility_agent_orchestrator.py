@@ -17,7 +17,6 @@ from ..tools.facility_matching import FacilityMatchingTool
 from ..tools.prioritization import PrioritizationTool
 from ..tools.notification_dispatch import NotificationDispatchTool
 from ..tools.logging_monitoring import LoggingMonitoringTool
-from ..tools.patient_notification_service import PatientNotificationService
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +32,6 @@ class FacilityAgentOrchestrator:
         self.prioritization_tool = PrioritizationTool()
         self.notification_tool = NotificationDispatchTool()
         self.logging_tool = LoggingMonitoringTool()
-        self.patient_notification_service = PatientNotificationService()
 
     def process_triage_case(self, triage_data: Dict) -> Dict:
         """
@@ -77,13 +75,6 @@ class FacilityAgentOrchestrator:
                 recommendation = self.prioritization_tool.get_booking_recommendation(
                     routing, prioritized_candidates
                 )
-
-                # Always auto-assign the top recommended facility so each facility user
-                # sees their incoming cases immediately.
-                if recommendation.get('recommended_facility'):
-                    routing.assigned_facility = recommendation['recommended_facility']
-                    routing.routing_status = FacilityRouting.RoutingStatus.PENDING
-                    routing.save(update_fields=['assigned_facility', 'routing_status', 'updated_at'])
                 
                 # Step 6: Log routing decision
                 self.logging_tool.log_routing_decision(
@@ -92,14 +83,7 @@ class FacilityAgentOrchestrator:
                     recommendation.get('reason', '')
                 )
                 
-                # Step 7: Send initial case update to patient
-                self.patient_notification_service.send_case_update_notification(
-                    routing=routing,
-                    update_message=f"Your case has been received and we are finding the best facility for you. {len(prioritized_candidates)} facilities have been identified. Risk level: {routing.risk_level}.",
-                    facility=recommendation.get('recommended_facility')
-                )
-                
-                # Step 8: Handle automatic booking
+                # Step 7: Handle automatic booking
                 notifications_sent = []
                 if booking_type == 'automatic' and recommendation.get('recommended_facility'):
                     notification = self._handle_automatic_booking(
@@ -107,8 +91,11 @@ class FacilityAgentOrchestrator:
                     )
                     notifications_sent.append(notification)
                 
-                # Step 9: Notify Follow-up Agent
+                # Step 8: Notify Follow-up Agent
                 self._notify_followup_agent(routing, recommendation)
+                
+                # Serialize recommendation to avoid JSON serialization errors
+                serialized_recommendation = self._serialize_recommendation(recommendation)
                 
                 return {
                     'success': True,
@@ -116,15 +103,26 @@ class FacilityAgentOrchestrator:
                     'patient_token': routing.patient_token,
                     'booking_type': booking_type,
                     'candidates_found': len(prioritized_candidates),
-                    'recommendation': recommendation,
+                    'recommendation': serialized_recommendation,
                     'notifications_sent': len(notifications_sent),
                 }
                 
         except Exception as e:
             logger.error(f"Error processing triage case: {str(e)}")
+            # Sanitize triage_data for logging to avoid JSON serialization errors
+            safe_triage_data = {
+                'patient_token': triage_data.get('patient_token'),
+                'triage_session_id': triage_data.get('triage_session_id'),
+                'risk_level': triage_data.get('risk_level'),
+                'primary_symptom': triage_data.get('primary_symptom'),
+                'patient_district': triage_data.get('patient_district'),
+                'age_group': triage_data.get('age_group'),
+                'sex': triage_data.get('sex'),
+                'complaint_text': triage_data.get('complaint_text'),
+            }
             self.logging_tool.log_system_event(
                 'triage_processing_error',
-                {'error': str(e), 'triage_data': triage_data},
+                {'error': str(e), 'triage_data': safe_triage_data},
                 'error'
             )
             return {
@@ -311,29 +309,43 @@ class FacilityAgentOrchestrator:
             patient_token=triage_data['patient_token'],
             triage_session_id=triage_data.get('triage_session_id', ''),
             risk_level=triage_data['risk_level'],
-            primary_symptom=triage_data.get('primary_symptom') or triage_data.get('complaint_group'),
+            primary_symptom=triage_data['primary_symptom'],
             secondary_symptoms=triage_data.get('secondary_symptoms', []),
             has_red_flags=triage_data.get('has_red_flags', False),
             chronic_conditions=triage_data.get('chronic_conditions', []),
-            patient_district=triage_data.get('district', triage_data.get('patient_district', '')),
+            age_group=triage_data.get('age_group'),
+            sex=triage_data.get('sex'),
+            patient_village=triage_data.get('patient_village'),
+            patient_district=triage_data['patient_district'],
             patient_location_lat=triage_data.get('patient_location_lat'),
             patient_location_lng=triage_data.get('patient_location_lng'),
         )
 
     def _handle_automatic_booking(self, routing: FacilityRouting, facility: Facility) -> FacilityNotification:
-        """Handle automatic booking for high-risk cases"""
-        # Send notification
-        notification = self.notification_tool.send_case_notification(routing, facility)
-        
-        # Update routing
+        """Handle automatic booking for high-risk cases - RECORD ONLY, NO NOTIFICATION"""
+        # Update routing with assigned facility
         routing.assigned_facility = facility
-        routing.routing_status = FacilityRouting.RoutingStatus.NOTIFIED
-        routing.facility_notified_at = timezone.now()
+        routing.routing_status = FacilityRouting.RoutingStatus.CONFIRMED
+        routing.facility_confirmed_at = timezone.now()
+        routing.facility_notified_at = timezone.now()  # Mark as "notified" for tracking
         routing.save()
         
         # Update facility capacity (reserve bed)
         if facility.available_beds and facility.available_beds > 0:
             facility.update_capacity(-1)
+        
+        # Create a dummy notification record for tracking (NO ACTUAL NOTIFICATION SENT)
+        notification = FacilityNotification.objects.create(
+            routing=routing,
+            facility=facility,
+            notification_type='new_case',
+            notification_status=FacilityNotification.NotificationStatus.ACKNOWLEDGED,  # Mark as acknowledged since we're not actually notifying
+            subject=f"Booking Confirmed - {routing.patient_token[:8]}",
+            message=f"Patient case automatically booked and confirmed.\n\nPatient Token: {routing.patient_token[:8]}\nRisk Level: {routing.risk_level}\nFacility: {facility.name}",
+            payload={'auto_booked': True, 'no_notification_sent': True},
+            acknowledged_at=timezone.now(),
+            response_received_at=timezone.now()
+        )
         
         return notification
 
@@ -352,6 +364,14 @@ class FacilityAgentOrchestrator:
         if beds_reserved > 0:
             facility = notification.facility
             facility.update_capacity(-beds_reserved)
+        
+        # Notify triage agent of confirmation
+        self.notify_triage_agent(routing, {
+            'response_type': 'confirm',
+            'beds_reserved': beds_reserved,
+            'facility_name': notification.facility.name,
+            'message': response_data.get('response_message', 'Facility confirmed patient admission')
+        })
 
     def _handle_facility_rejection(self, routing: FacilityRouting, 
                                  notification: FacilityNotification, response_data: Dict):
@@ -370,9 +390,23 @@ class FacilityAgentOrchestrator:
             self.notification_tool.send_case_notification(
                 routing, alternative_candidate.facility
             )
+            
+            # Notify triage agent about alternative attempt
+            self.notify_triage_agent(routing, {
+                'response_type': 'alternative_found',
+                'alternative_facility': alternative_candidate.facility.name,
+                'message': f"Trying alternative facility: {alternative_candidate.facility.name}"
+            })
         else:
             routing.routing_status = FacilityRouting.RoutingStatus.REJECTED
             routing.save()
+            
+            # Notify triage agent about rejection with no alternatives
+            self.notify_triage_agent(routing, {
+                'response_type': 'reject',
+                'no_alternatives': True,
+                'message': f"All facilities rejected. {response_data.get('response_message', 'No reason provided')}"
+            })
 
     def _find_alternative_facility(self, routing: FacilityRouting) -> Optional[FacilityCandidate]:
         """Find alternative facility candidate"""
@@ -389,18 +423,8 @@ class FacilityAgentOrchestrator:
 
     def _handle_no_facilities(self, routing: FacilityRouting):
         """Handle case when no suitable facilities are found"""
-        logger.warning(
-            "No suitable facilities found for routing_id=%s patient_token=%s district=%s risk=%s",
-            routing.id,
-            routing.patient_token,
-            routing.patient_district,
-            routing.risk_level,
-        )
-
-        # Keep the routing in a pending/unassigned state so it can be retried after
-        # facility configuration changes (e.g., district mapping, services catalog).
-        routing.routing_status = FacilityRouting.RoutingStatus.PENDING
-        routing.save(update_fields=['routing_status', 'updated_at'])
+        routing.routing_status = FacilityRouting.RoutingStatus.CANCELLED
+        routing.save()
         
         self.logging_tool.log_system_event(
             'no_facilities_found',
@@ -417,11 +441,21 @@ class FacilityAgentOrchestrator:
         """Notify Follow-up Agent about routing outcome"""
         # This would integrate with the Follow-up Agent API
         # For now, log the notification
+        recommended_facility = recommendation.get('recommended_facility')
+        facility_data = None
+        if recommended_facility:
+            facility_data = {
+                'id': recommended_facility.id,
+                'name': recommended_facility.name,
+                'address': recommended_facility.address,
+                'district': recommended_facility.district,
+            }
+        
         followup_data = {
             'patient_token': routing.patient_token,
             'routing_id': routing.id,
             'booking_type': routing.booking_type,
-            'assigned_facility': recommendation.get('recommended_facility'),
+            'assigned_facility': facility_data,
             'requires_followup': True,
             'followup_priority': 'high' if routing.is_emergency else 'medium',
             'timestamp': timezone.now().isoformat(),
@@ -433,10 +467,52 @@ class FacilityAgentOrchestrator:
             'info'
         )
 
+    def notify_triage_agent(self, routing: FacilityRouting, response_data: Dict):
+        """
+        Send facility response back to triage agent for patient notification
+        
+        Args:
+            routing: FacilityRouting with patient case details
+            response_data: Facility response (confirm/reject)
+        """
+        try:
+            # Import here to avoid circular imports
+            from apps.triage.services.facility_bridge import update_triage_with_facility_response
+            
+            facility_name = None
+            if routing.assigned_facility:
+                facility_name = routing.assigned_facility.name
+            
+            callback_data = {
+                'patient_token': routing.patient_token,
+                'routing_id': routing.id,
+                'facility_response': response_data,
+                'facility_name': facility_name,
+                'response_timestamp': timezone.now().isoformat(),
+                'booking_status': routing.routing_status,
+            }
+            
+            # Update triage session with facility response
+            update_triage_with_facility_response(callback_data)
+            
+            self.logging_tool.log_system_event(
+                'triage_callback_sent',
+                callback_data,
+                'info'
+            )
+            
+        except Exception as e:
+            logger.error(f"Failed to notify triage agent for {routing.patient_token}: {e}")
+            self.logging_tool.log_system_event(
+                'triage_callback_error',
+                {'error': str(e), 'routing_id': routing.id},
+                'error'
+            )
+
     def run_maintenance_tasks(self) -> Dict:
         """
         Run routine maintenance tasks
-        Retry failed notifications, check for overdue responses, etc.
+        NOTE: Notifications to hospitals are disabled - only record keeping
         """
         results = {
             'timestamp': timezone.now().isoformat(),
@@ -444,23 +520,17 @@ class FacilityAgentOrchestrator:
         }
         
         try:
-            # Retry failed notifications
-            retried_count = self.notification_tool.retry_failed_notifications()
+            # Skip retrying failed notifications since we don't send to hospitals
             results['tasks_completed'].append({
                 'task': 'retry_failed_notifications',
-                'result': f'Retried {retried_count} notifications',
+                'result': 'Skipped - hospital notifications disabled',
             })
             
-            # Check for overdue acknowledgments
-            overdue_notifications = self.notification_tool.check_pending_acknowledgments()
-            if overdue_notifications:
-                for notification in overdue_notifications:
-                    self.notification_tool.send_follow_up_reminder(notification)
-                
-                results['tasks_completed'].append({
-                    'task': 'check_overdue_acknowledgments',
-                    'result': f'Sent {len(overdue_notifications)} follow-up reminders',
-                })
+            # Skip checking pending acknowledgments since we don't send to hospitals
+            results['tasks_completed'].append({
+                'task': 'check_overdue_acknowledgments',
+                'result': 'Skipped - hospital notifications disabled',
+            })
             
             # Log performance metrics
             metrics = self._collect_performance_metrics()
@@ -475,6 +545,48 @@ class FacilityAgentOrchestrator:
             results['error'] = str(e)
         
         return results
+
+    def _serialize_recommendation(self, recommendation: Dict) -> Dict:
+        """Serialize recommendation dictionary to avoid JSON serialization errors"""
+        serialized = recommendation.copy()
+        
+        # Convert Facility object to dictionary if present
+        if 'recommended_facility' in serialized and serialized['recommended_facility']:
+            facility = serialized['recommended_facility']
+            serialized['recommended_facility'] = {
+                'id': facility.id,
+                'name': facility.name,
+                'address': facility.address,
+                'district': facility.district,
+                'facility_type': facility.facility_type,
+                'phone_number': facility.phone_number,
+                'available_beds': facility.available_beds,
+                'total_beds': facility.total_beds,
+            }
+        
+        # Handle alternative facilities (list of dicts with Facility objects)
+        if 'alternative_facilities' in serialized and serialized['alternative_facilities']:
+            serialized_alternatives = []
+            for alt in serialized['alternative_facilities']:
+                if 'facility' in alt and alt['facility']:
+                    facility = alt['facility']
+                    alt_serialized = alt.copy()
+                    alt_serialized['facility'] = {
+                        'id': facility.id,
+                        'name': facility.name,
+                        'address': facility.address,
+                        'district': facility.district,
+                        'facility_type': facility.facility_type,
+                        'phone_number': facility.phone_number,
+                        'available_beds': facility.available_beds,
+                        'total_beds': facility.total_beds,
+                    }
+                    serialized_alternatives.append(alt_serialized)
+                else:
+                    serialized_alternatives.append(alt)
+            serialized['alternative_facilities'] = serialized_alternatives
+        
+        return serialized
 
     def _collect_performance_metrics(self) -> Dict:
         """Collect performance metrics for monitoring"""
