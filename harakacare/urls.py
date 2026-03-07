@@ -19,10 +19,12 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
+from apps.core.views import force_migrations
 
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('api/force-migrate/', force_migrations),
     path('api/facilities/', include('apps.facilities.urls')),
     path('api/v1/triage/', include('apps.triage.urls')),  # ADD THIS LINE
     # path('messaging/', include('apps.messaging.urls')),  # Add this line    
