@@ -34,7 +34,32 @@ INSTALLED_APPS = [
     'apps.messaging',
 ]
 
+# CORS for production - Allow all Vercel subdomains
+CORS_ALLOWED_ORIGINS = os.environ.get('CORS_ALLOWED_ORIGINS', '').split(',') if os.environ.get('CORS_ALLOWED_ORIGINS') else [
+    'https://harakacare-front.vercel.app',
+    'https://harakacare-frontend.vercel.app',
+    'https://localhost:3000',
+    'http://localhost:3000',
+]
+
+# Allow all Vercel subdomains dynamically
+class VercelCorsMiddleware:
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        origin = request.headers.get('origin')
+        if origin and ('vercel.app' in origin or 'localhost' in origin):
+            response = self.get_response(request)
+            response['Access-Control-Allow-Origin'] = origin
+            response['Access-Control-Allow-Credentials'] = 'true'
+            response['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+            response['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+            return response
+        return self.get_response(request)
+
 MIDDLEWARE = [
+    'harakacare.settings.production.VercelCorsMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
