@@ -11,8 +11,9 @@ from django.db import connection
 def force_migrations(request):
     """Force run migrations via API call"""
     try:
-        # Create the triage_villagecoordinates table manually
+        # Create all required triage tables manually
         with connection.cursor() as cursor:
+            # Create triage_villagecoordinates table
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS triage_villagecoordinates (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -31,9 +32,32 @@ def force_migrations(request):
                 ON triage_villagecoordinates(village, district)
             """)
             
+            # Create triage_triagecase table
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS triage_triagecase (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    patient_token VARCHAR(50) UNIQUE NOT NULL,
+                    age_group VARCHAR(50) NOT NULL,
+                    sex VARCHAR(10) NOT NULL,
+                    district VARCHAR(100) NOT NULL,
+                    village VARCHAR(100),
+                    complaint_group VARCHAR(100),
+                    patient_relation VARCHAR(50),
+                    consent_medical_triage BOOLEAN NOT NULL,
+                    consent_data_sharing BOOLEAN NOT NULL,
+                    consent_follow_up BOOLEAN NOT NULL,
+                    location_consent BOOLEAN DEFAULT FALSE,
+                    complaint_text TEXT,
+                    device_location_lat REAL,
+                    device_location_lng REAL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            
         return JsonResponse({
             'status': 'success',
-            'message': 'triage_villagecoordinates table created successfully'
+            'message': 'All triage tables created successfully'
         })
         
     except Exception as e:
