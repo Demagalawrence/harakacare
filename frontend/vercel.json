@@ -22,12 +22,5 @@
   ],
   "env": {
     "REACT_APP_API_URL": "https://harakacare.onrender.com/api"
-  },
-  "functions": {},
-  "rewrites": [
-    {
-      "source": "/(.*)",
-      "destination": "/index.html"
-    }
-  ]
+  }
 }
