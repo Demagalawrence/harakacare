@@ -55,6 +55,19 @@ def force_migrations(request):
                 )
             """)
             
+            # Create triage_triagesession table
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS triage_triagesession (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    patient_token VARCHAR(50) NOT NULL,
+                    session_data TEXT,
+                    current_step INTEGER DEFAULT 1,
+                    is_completed BOOLEAN DEFAULT FALSE,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            
         return JsonResponse({
             'status': 'success',
             'message': 'All triage tables created successfully'
