@@ -129,6 +129,7 @@ REST_FRAMEWORK = {
 CORS_ALLOWED_ORIGINS = os.environ.get('CORS_ALLOWED_ORIGINS', '').split(',') if os.environ.get('CORS_ALLOWED_ORIGINS') else [
     'https://harakacare-front.vercel.app',
     'https://harakacare-frontend.vercel.app',
+    'https://harakacare-front-gk39rhq75-demagalawrences-projects.vercel.app',
     'https://localhost:3000',
     'http://localhost:3000',
 ]
