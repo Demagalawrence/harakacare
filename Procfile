@@ -1,1 +1,1 @@
-web: source venv/bin/activate && ./bin/ensure-migrations.sh && gunicorn harakacare.wsgi:application --bind 0.0.0.0:$PORT
+web: source venv/bin/activate && python manage.py ensure_db && gunicorn harakacare.wsgi:application --bind 0.0.0.0:$PORT
