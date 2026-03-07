@@ -74,6 +74,10 @@ def force_migrations(request):
                 cursor.execute("ALTER TABLE triage_triagesession ADD COLUMN created_by_id INTEGER")
             except:
                 pass  # Column might already exist
+            try:
+                cursor.execute("ALTER TABLE triage_triagesession ADD COLUMN updated_by_id INTEGER")
+            except:
+                pass  # Column might already exist
             
         return JsonResponse({
             'status': 'success',
