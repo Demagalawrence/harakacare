@@ -21,7 +21,7 @@
     }
   ],
   "env": {
-    "REACT_APP_API_URL": "https://your-railway-app.railway.app/api"
+    "REACT_APP_API_URL": "https://harakacare.onrender.com/api"
   },
   "functions": {},
   "rewrites": [
