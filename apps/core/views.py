@@ -69,6 +69,12 @@ def force_migrations(request):
                 )
             """)
             
+            # Add missing columns if table already exists
+            try:
+                cursor.execute("ALTER TABLE triage_triagesession ADD COLUMN created_by_id INTEGER")
+            except:
+                pass  # Column might already exist
+            
         return JsonResponse({
             'status': 'success',
             'message': 'All triage tables created successfully'
