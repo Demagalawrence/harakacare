@@ -45,6 +45,38 @@ class Command(BaseCommand):
             try:
                 call_command('migrate', verbosity=2)
                 self.stdout.write(self.style.SUCCESS('Migrations completed successfully!'))
+                
+                # Check again after migrations
+                cursor.execute("""
+                    SELECT name FROM sqlite_master 
+                    WHERE type='table'
+                """)
+                all_tables_after = [row[0] for row in cursor.fetchall()]
+                still_missing = [t for t in missing_tables if t not in all_tables_after]
+                
+                if still_missing:
+                    self.stdout.write(self.style.ERROR(f'Still missing after migrations: {still_missing}'))
+                    # Try manual table creation for villagecoordinates
+                    if 'triage_villagecoordinates' in still_missing:
+                        self.stdout.write('Creating triage_villagecoordinates table manually...')
+                        cursor.execute("""
+                            CREATE TABLE IF NOT EXISTS triage_villagecoordinates (
+                                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                village VARCHAR(100) NOT NULL,
+                                district VARCHAR(100) NOT NULL,
+                                latitude REAL NOT NULL,
+                                longitude REAL NOT NULL,
+                                last_updated DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                lookup_count INTEGER DEFAULT 1,
+                                UNIQUE(village, district)
+                            )
+                        """)
+                        cursor.execute("""
+                            CREATE INDEX IF NOT EXISTS triage_vill_village_79ec71_idx 
+                            ON triage_villagecoordinates(village, district)
+                        """)
+                        self.stdout.write(self.style.SUCCESS('Manual table creation completed!'))
+                
             except Exception as e:
                 self.stdout.write(self.style.ERROR(f'Migration failed: {e}'))
         else:
