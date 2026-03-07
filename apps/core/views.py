@@ -55,29 +55,21 @@ def force_migrations(request):
                 )
             """)
             
-            # Create triage_triagesession table
+            # Drop and recreate triage_triagesession table
+            cursor.execute("DROP TABLE IF EXISTS triage_triagesession")
             cursor.execute("""
-                CREATE TABLE IF NOT EXISTS triage_triagesession (
+                CREATE TABLE triage_triagesession (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     patient_token VARCHAR(50) NOT NULL,
                     session_data TEXT,
                     current_step INTEGER DEFAULT 1,
                     is_completed BOOLEAN DEFAULT FALSE,
                     created_by_id INTEGER,
+                    updated_by_id INTEGER,
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
                 )
             """)
-            
-            # Add missing columns if table already exists
-            try:
-                cursor.execute("ALTER TABLE triage_triagesession ADD COLUMN created_by_id INTEGER")
-            except:
-                pass  # Column might already exist
-            try:
-                cursor.execute("ALTER TABLE triage_triagesession ADD COLUMN updated_by_id INTEGER")
-            except:
-                pass  # Column might already exist
             
         return JsonResponse({
             'status': 'success',
