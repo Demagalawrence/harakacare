@@ -95,6 +95,7 @@ const FacilityDashboard = () => {
         if (filter === 'pending') return c.status === 'pending';
         if (filter === 'confirmed') return c.status === 'confirmed';
         if (filter === 'auto_assigned') return c.status === 'auto_assigned';
+        if (filter === 'auto_confirmed') return isAutoConfirmed(c);
         return true;
       });
     }
@@ -168,6 +169,10 @@ const FacilityDashboard = () => {
       case 'rejected': return 'bg-gray-100 text-gray-800';
       default: return 'bg-gray-100 text-gray-800';
     }
+  };
+
+  const isAutoConfirmed = (caseItem) => {
+    return caseItem.status === 'confirmed' && caseItem.bookingType === 'automatic';
   };
 
   const formatTime = (timestamp) => {
@@ -349,6 +354,7 @@ const FacilityDashboard = () => {
               <option value="pending">Pending</option>
               <option value="confirmed">Confirmed</option>
               <option value="auto_assigned">Auto Assigned</option>
+              <option value="auto_confirmed">Auto Confirmed</option>
             </select>
           </div>
 
@@ -438,6 +444,12 @@ const FacilityDashboard = () => {
                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadgeClass(caseItem.status)}`}>
                       {caseItem.status.replace('_', ' ').toUpperCase()}
                     </span>
+                    {isAutoConfirmed(caseItem) && (
+                      <div className="flex items-center mt-1 text-xs text-success-600">
+                        <CheckCircle className="w-3 h-3 mr-1" />
+                        Auto-confirmed
+                      </div>
+                    )}
                     {caseItem.redFlagSymptoms && caseItem.redFlagSymptoms.length > 0 && (
                       <div className="flex items-center mt-1 text-xs text-danger-600">
                         <AlertCircle className="w-3 h-3 mr-1" />
