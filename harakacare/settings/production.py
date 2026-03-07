@@ -3,6 +3,10 @@ import os
 
 DEBUG = False
 
+# Core Django settings
+ROOT_URLCONF = 'harakacare.urls'
+WSGI_APPLICATION = 'harakacare.wsgi.application'
+
 # Security
 SECRET_KEY = os.environ.get('SECRET_KEY', SECRET_KEY)
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '').split(',') if os.environ.get('ALLOWED_HOSTS') else ['.onrender.com', 'localhost', '127.0.0.1']
