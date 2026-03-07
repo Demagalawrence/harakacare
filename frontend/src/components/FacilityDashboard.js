@@ -112,7 +112,7 @@ const FacilityDashboard = () => {
     }
 
     setFilteredCases(filtered);
-  }, [filter, searchTerm, cases]);
+  }, [filter, searchTerm, cases, facility]);
 
   const handleCaseAction = async (caseId, action) => {
     try {
