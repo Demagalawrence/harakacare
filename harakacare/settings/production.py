@@ -1,14 +1,14 @@
-from .base import *
 import os
+from .base import *
 
 DEBUG = False
 
-# Core Django settings
+# Core Django settings - ensure these are always set
 ROOT_URLCONF = 'harakacare.urls'
 WSGI_APPLICATION = 'harakacare.wsgi.application'
 
 # Security
-SECRET_KEY = os.environ.get('SECRET_KEY', SECRET_KEY)
+SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-default-key-for-render')
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '').split(',') if os.environ.get('ALLOWED_HOSTS') else ['.onrender.com', 'localhost', '127.0.0.1']
 
 # Database - Use Railway PostgreSQL

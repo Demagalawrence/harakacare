@@ -11,9 +11,9 @@ build:
   # Run migrations
   python manage.py migrate
 
-# Start command
+# Start command with explicit settings module
 start:
-  gunicorn harakacare.wsgi:application
+  gunicorn harakacare.wsgi:application --env DJANGO_SETTINGS_MODULE=harakacare.settings.production
 
 # Environment variables (set these in Render dashboard)
 environment:
