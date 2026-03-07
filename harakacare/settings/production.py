@@ -5,7 +5,7 @@ DEBUG = False
 
 # Security
 SECRET_KEY = os.environ.get('SECRET_KEY', SECRET_KEY)
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '').split(',') if os.environ.get('ALLOWED_HOSTS') else ['.railway.app', 'localhost', '127.0.0.1']
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '').split(',') if os.environ.get('ALLOWED_HOSTS') else ['.onrender.com', 'localhost', '127.0.0.1']
 
 # Database - Use Railway PostgreSQL
 DATABASES = {
