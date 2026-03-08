@@ -65,8 +65,8 @@ class VercelCorsMiddleware:
         return self.get_response(request)
 
 MIDDLEWARE = [
-    'harakacare.settings.production.VercelCorsMiddleware',
     'corsheaders.middleware.CorsMiddleware',
+    'apps.core.middleware.EnsureTablesMiddleware',  # Auto-create missing tables
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -74,6 +74,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'apps.core.middleware.VercelCorsMiddleware',  # Dynamic CORS for Vercel
 ]
 
 # Core Django settings - ensure these are always set
