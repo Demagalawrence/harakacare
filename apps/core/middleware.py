@@ -169,3 +169,16 @@ class EnsureTablesMiddleware(MiddlewareMixin):
         """)
         
         print("✅ Automatically created missing triage tables")
+
+
+class VercelCorsMiddleware(MiddlewareMixin):
+    """Dynamic CORS middleware for Vercel deployments"""
+    
+    def process_response(self, request, response):
+        origin = request.headers.get('origin')
+        if origin and ('vercel.app' in origin or 'localhost' in origin):
+            response['Access-Control-Allow-Origin'] = origin
+            response['Access-Control-Allow-Credentials'] = 'true'
+            response['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+            response['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+        return response
