@@ -40,7 +40,13 @@ CORS_ALLOWED_ORIGINS = os.environ.get('CORS_ALLOWED_ORIGINS', '').split(',') if 
     'https://harakacare-frontend.vercel.app',
     'https://localhost:3000',
     'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    'https://127.0.0.1:3000',
 ]
+
+# Allow all origins for development
+CORS_ALLOW_ALL_ORIGINS = DEBUG  # Allow all origins when DEBUG=True
+CORS_ALLOW_CREDENTIALS = True
 
 # Allow all Vercel subdomains dynamically
 class VercelCorsMiddleware:
