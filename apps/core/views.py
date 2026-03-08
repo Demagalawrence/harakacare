@@ -64,6 +64,7 @@ def force_migrations(request):
                     session_data TEXT,
                     current_step INTEGER DEFAULT 1,
                     is_completed BOOLEAN DEFAULT FALSE,
+                    is_active BOOLEAN DEFAULT TRUE,
                     created_by_id INTEGER,
                     updated_by_id INTEGER,
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
