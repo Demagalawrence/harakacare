@@ -1,7 +1,8 @@
 """
-360dialog WhatsApp Webhook View
-Receives and validates inbound webhook events from 360dialog,
+Meta WhatsApp Cloud API Webhook View
+Receives and validates inbound webhook events from Meta WhatsApp Cloud API,
 then routes them to the WhatsApp handler.
+Updated from 360dialog to Meta WhatsApp Cloud API.
 """
 
 from __future__ import annotations
@@ -21,22 +22,24 @@ from apps.messaging.whatsapp.whatsapp_handler import WhatsAppHandler
 
 logger = logging.getLogger(__name__)
 
-# Shared secret set in 360dialog dashboard → used to verify webhook signatures
-WEBHOOK_SECRET = getattr(settings, "THREESIXTY_DIALOG_WEBHOOK_SECRET", "")
+# Webhook verification token from Meta Developer Dashboard
+WEBHOOK_VERIFY_TOKEN = getattr(settings, "META_WHATSAPP_WEBHOOK_VERIFY_TOKEN", "")
+# App secret for webhook signature verification
+APP_SECRET = getattr(settings, "META_WHATSAPP_APP_SECRET", "")
 
 # Singleton handler (re-used across requests to reuse DB connections etc.)
 _handler = WhatsAppHandler()
 
 
-def _verify_signature(request) -> bool:
+def _verify_webhook_signature(request) -> bool:
     """
-    Verify the X-Hub-Signature-256 header sent by 360dialog.
-    Returns True if the signature is valid OR if no secret is configured
+    Verify X-Hub-Signature-256 header sent by Meta.
+    Returns True if signature is valid OR if no secret is configured
     (development mode).
     """
-    if not WEBHOOK_SECRET:
+    if not APP_SECRET:
         # No secret configured — skip verification (dev/sandbox only)
-        logger.warning("THREESIXTY_DIALOG_WEBHOOK_SECRET not set — skipping signature check")
+        logger.warning("META_WHATSAPP_APP_SECRET not set — skipping signature verification")
         return True
 
     signature_header = request.headers.get("X-Hub-Signature-256", "")
@@ -44,40 +47,27 @@ def _verify_signature(request) -> bool:
         logger.warning("Webhook received without valid signature header")
         return False
 
-    expected = hmac.new(
-        WEBHOOK_SECRET.encode(),
+    expected_signature = hmac.new(
+        APP_SECRET.encode(),
         request.body,
-        hashlib.sha256,
+        hashlib.sha256
     ).hexdigest()
 
-    received = signature_header[len("sha256="):]
-    return hmac.compare_digest(expected, received)
-
-
-def _extract_messages(payload: dict) -> list[dict]:
-    """
-    Pull the list of message objects out of the 360dialog webhook payload.
-    360dialog uses the standard WhatsApp Cloud API envelope format.
-    """
-    messages = []
-    for entry in payload.get("entry", []):
-        for change in entry.get("changes", []):
-            value = change.get("value", {})
-            for msg in value.get("messages", []):
-                # Attach contact info if present
-                contacts = value.get("contacts", [])
-                if contacts:
-                    msg["_contact"] = contacts[0]
-                messages.append(msg)
-    return messages
+    received_signature = signature_header.split("sha256=")[1]
+    is_valid = hmac.compare_digest(expected_signature, received_signature)
+    
+    if not is_valid:
+        logger.warning(f"Webhook signature verification failed. Expected: {expected_signature}, Received: {received_signature}")
+    
+    return is_valid
 
 
 @method_decorator(csrf_exempt, name="dispatch")
 class WhatsAppWebhookView(View):
     """
-    Handles inbound 360dialog webhook requests.
+    Handles inbound Meta WhatsApp Cloud API webhook requests.
 
-    GET  — Webhook verification challenge (360dialog sends this once during setup)
+    GET  — Webhook verification challenge (Meta sends this once during setup)
     POST — Inbound message events
     """
 
@@ -85,14 +75,14 @@ class WhatsAppWebhookView(View):
 
     def get(self, request):
         """
-        360dialog sends a GET with hub.challenge when you first register
+        Meta sends a GET with hub.challenge when you first register
         the webhook URL. Echo the challenge back to confirm ownership.
         """
         mode      = request.GET.get("hub.mode")
         challenge = request.GET.get("hub.challenge")
         token     = request.GET.get("hub.verify_token")
 
-        verify_token = getattr(settings, "THREESIXTY_DIALOG_VERIFY_TOKEN", "harakacare_verify")
+        verify_token = getattr(settings, "META_WHATSAPP_WEBHOOK_VERIFY_TOKEN", "harakacare_meta_verify")
 
         if mode == "subscribe" and token == verify_token:
             logger.info("WhatsApp webhook verified successfully")
@@ -105,12 +95,12 @@ class WhatsAppWebhookView(View):
 
     def post(self, request):
         """
-        Receive and process inbound WhatsApp messages from 360dialog.
+        Receive and process inbound WhatsApp messages from Meta WhatsApp Cloud API.
         Always returns 200 quickly — heavy work is done synchronously here
         but can be moved to a Celery task if latency becomes an issue.
         """
         # 1. Verify signature
-        if not _verify_signature(request):
+        if not _verify_webhook_signature(request):
             return HttpResponse("Invalid signature", status=403)
 
         # 2. Parse body
@@ -123,13 +113,13 @@ class WhatsAppWebhookView(View):
         logger.debug(f"Webhook payload: {json.dumps(payload)[:500]}")
 
         # 3. Extract messages
-        messages = _extract_messages(payload)
+        messages = self._extract_messages(payload)
         if not messages:
             # Status update or other event — acknowledge and ignore
             return JsonResponse({"status": "ok"}, status=200)
 
         # 4. Deduplicate + process.
-        # 360dialog retries the webhook if it doesn't get a fast 200, which causes
+        # Meta retries the webhook if it doesn't get a fast 200, which causes
         # the same message to be processed multiple times. We guard against this by
         # caching the message_id for 10 minutes (well beyond any retry window).
         from django.core.cache import cache as _cache
@@ -148,6 +138,23 @@ class WhatsAppWebhookView(View):
                 logger.error(f"Error processing message: {exc}", exc_info=True)
 
         return JsonResponse({"status": "ok"}, status=200)
+
+    def _extract_messages(self, payload: dict) -> list[dict]:
+        """
+        Pull the list of message objects out of the Meta webhook payload.
+        Meta uses the standard WhatsApp Cloud API envelope format.
+        """
+        messages = []
+        for entry in payload.get("entry", []):
+            for change in entry.get("changes", []):
+                value = change.get("value", {})
+                for msg in value.get("messages", []):
+                    # Attach contact info if present
+                    contacts = value.get("contacts", [])
+                    if contacts:
+                        msg["_contact"] = contacts[0]
+                    messages.append(msg)
+        return messages
 
     def _process_message(self, msg: dict) -> None:
         """Route a single message object to the WhatsApp handler."""
@@ -188,13 +195,22 @@ class WhatsAppWebhookView(View):
                 _handler.handle(phone=phone, message_text=text, message_id=message_id)
             return
 
+        # ---- Location messages ----
+        if msg_type == "location":
+            location = msg.get("location", {})
+            lat = location.get("latitude")
+            lng = location.get("longitude")
+            if lat and lng:
+                text = f"{lat},{lng}"
+                _handler.handle(phone=phone, message_text=text, message_id=message_id)
+            return
+
         # ---- Unsupported message types ----
         unsupported = {
             "image":    "images",
             "audio":    "audio/voice messages",
             "video":    "video",
             "document": "documents",
-            "location": "location pins",
             "sticker":  "stickers",
             "reaction": None,  # Silently ignore reactions
         }

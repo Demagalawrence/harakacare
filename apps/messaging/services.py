@@ -17,7 +17,7 @@ def route_incoming_message(phone, text, channel):
         return handle_sms(patient_token, text)
 
 
-# ---------------- WHATSAPP (AI) ----------------
+# ---------------- WHATSAPP (Meta Cloud API) ----------------
 
 def handle_whatsapp(patient_token, text):
 

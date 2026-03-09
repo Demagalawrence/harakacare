@@ -3,6 +3,7 @@ from .models import (
     Facility, FacilityRouting, FacilityCandidate,
     FacilityNotification, FacilityCapacityLog
 )
+from .forms import FacilityForm
 
 
 @admin.register(Facility)
@@ -14,16 +15,26 @@ class FacilityAdmin(admin.ModelAdmin):
     with filtering, searching, and ordering capabilities.
     """
 
+    form = FacilityForm
+    
     list_display = (
         'name', 'facility_type', 'district', 'phone_number',
         'total_beds', 'available_beds', 'staff_count',
         'average_wait_time_minutes', 'ambulance_available',
-        'is_active', 'created_at',
+        'get_services_list', 'is_active', 'created_at',
     )
     list_filter = ('facility_type', 'is_active', 'ambulance_available', 'district', 'created_at')
     search_fields = ('name', 'address', 'district', 'phone_number')
     ordering = ('name',)
     readonly_fields = ('created_at', 'updated_at')
+
+    def get_services_list(self, obj):
+        """Display services as a comma-separated list"""
+        services = obj.get_services_display()
+        if services:
+            return ', '.join(services[:3]) + ('...' if len(services) > 3 else '')
+        return 'None'
+    get_services_list.short_description = 'Services'
 
     fieldsets = (
         ('Basic Information', {

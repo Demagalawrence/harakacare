@@ -712,8 +712,6 @@ Write ONE WhatsApp reply that:
 
     return raw
 
-
-# ============================================================================
 # EMERGENCY DETECTION
 # ============================================================================
 
@@ -725,7 +723,7 @@ def detect_emergency_in_text(text: str) -> Dict[str, Any]:
         "convulsions":                 [r"\b(convulsion|seizure|fitting|kiguguumizi|shaking all over)\b"],
         "severe_bleeding":             [r"\b(heavy bleeding|bleeding a lot|hemorrhage|blood everywhere|can'?t stop bleeding)\b"],
         "signs_of_shock":              [r"\b(very pale|cold hands|collapsed|cold sweat|faint)\b"],
-        "cardiac_emergency":           [r"\b(chest pain|heart attack|heart pain|crushing chest)\b"],
+        "cardiac_emergency":           [r"\b(chest pain|heart attack|crushing chest)\b"],
         "stroke_signs":                [r"\b(stroke|face drooping|arm weakness|speech difficulty|sudden numbness)\b"],
         "lethargic_infant":            [r"\b(floppy|very sleepy|difficult to wake|limp baby|listless baby)\b"],
     }
@@ -735,21 +733,21 @@ def detect_emergency_in_text(text: str) -> Dict[str, Any]:
             if re.search(pattern, t):
                 detected[flag] = True
                 break
-
+    
+    # Only trigger emergency for actual emergency situations, not booking confirmations
+    # Add additional check to avoid false positives
+    booking_indicators = ["booking confirmed", "appointment", "facility", "hospital", "scheduled", "confirmed"]
+    is_booking_message = any(indicator in t for indicator in booking_indicators)
+    
     requires_immediate = any(flag in detected for flag in [
-        "severe_breathing_difficulty", "unconscious", "convulsions",
-        "cardiac_emergency", "stroke_signs",
+        "unconscious", "convulsions", "severe_bleeding", "cardiac_emergency", "stroke_signs"
     ])
+    
     return {
         "has_emergency":       len(detected) > 0,
         "detected_flags":      detected,
-        "requires_immediate":  requires_immediate,
+        "requires_immediate":  requires_immediate and not is_booking_message,
     }
-
-
-# ============================================================================
-# SEVERITY ESCALATION
-# ============================================================================
 
 def escalate_severity(
     base_severity: Optional[str],

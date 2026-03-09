@@ -48,19 +48,10 @@ ALL_REQUIRED_FIELDS = [
 ]
 
 CONVERSATIONAL_REQUIRED = [
-    "age_group",
-    "sex",
-    "complaint_group",
-    "severity",
-    "duration",
-    "progression_status",
-    "condition_occurrence",
-    "allergies",
-    "chronic_conditions",
-    "location",
-    "village",
-    "on_medication",
-    "consents",
+    "age_group", "sex", "consents", "complaint_group", "severity", "duration",
+    "progression_status", "condition_occurrence", "location", "village",
+    "chronic_conditions", "on_medication", "allergies",
+    "pregnancy_status",
 ]
 
 EMERGENCY_REQUIRED = ["age_group", "complaint_group", "severity"]
@@ -71,7 +62,7 @@ UGANDAN_DISTRICTS = [
     "kampala", "wakiso", "mukono", "jinja", "mbarara",
     "gulu", "lira", "mbale", "arua", "kasese", "masaka",
     "hoima", "fort portal", "kabale", "soroti", "tororo",
-    "iganga", "entebbe", "mityana", "mubende",
+    "iganga", "entebbe", "mityana", "mubende","luwero",
 ]
 
 _CONDITION_OCCURRENCE_PRIORITY = {"long_term": 2, "happened_before": 1, "first": 0}
@@ -80,18 +71,66 @@ _ALLERGY_STATUS_PRIORITY        = {"yes": 2, "not_sure": 1, "no": 0}
 # ── Structured menu definitions ───────────────────────────────────────────────
 # Each entry: field_name → {prompt, options: {user_input → stored_value}}
 STRUCTURED_MENUS: Dict[str, Dict] = {
+    "age_group": {
+        "prompt": (
+            "First, I need to know the patient's age group. Please select:\n"
+            "1️⃣ Newborn (0-2 months)\n"
+            "2️⃣ Infant (3-11 months)\n"
+            "3️⃣ Child (1-5 years)\n"
+            "4️⃣ Child (6-12 years)\n"
+            "5️⃣ Teen (13-17 years)\n"
+            "6️⃣ Adult (18-64 years)\n"
+            "7️⃣ Elderly (65+ years)\n\n"
+            "Reply with 1, 2, 3, 4, 5, 6, or 7."
+        ),
+        "options": {
+            "1": "newborn", "newborn": "newborn", "0-2 months": "newborn", "baby": "newborn",
+            "2": "infant", "infant": "infant", "3-11 months": "infant", "baby": "infant",
+            "3": "child_1_5", "child": "child_1_5", "1-5 years": "child_1_5", "toddler": "child_1_5",
+            "4": "child_6_12", "child": "child_6_12", "6-12 years": "child_6_12", "kid": "child_6_12",
+            "5": "teen", "teenager": "teen", "13-17 years": "teen", "adolescent": "teen",
+            "6": "adult", "grownup": "adult", "18-64 years": "adult", "mature": "adult",
+            "7": "elderly", "senior": "elderly", "65+ years": "elderly", "old": "elderly",
+        },
+    },
+    "sex": {
+        "prompt": (
+            "⚧️ What is the patient's sex?\n"
+            "1️⃣ Male\n"
+            "2️⃣ Female\n\n"
+            "Reply with 1 or 2."
+        ),
+        "options": {
+            "1": "male", "male": "male", "man": "male", "boy": "male", "m": "male",
+            "2": "female", "female": "female", "woman": "female", "girl": "female", "f": "female",
+        },
+    },
+    "pregnancy_status": {
+        "prompt": (
+            "🤰 Is the patient currently pregnant?\n"
+            "1️⃣ Yes\n"
+            "2️⃣ No\n"
+            "3️⃣ Not sure\n\n"
+            "Reply with 1, 2, or 3."
+        ),
+        "options": {
+            "1": "yes",      "yes": "yes",      "pregnant": "yes",
+            "2": "no",       "no": "no",        "not pregnant": "no",
+            "3": "not_sure", "not sure": "not_sure", "unsure": "not_sure", "maybe": "not_sure",
+        },
+    },
     "progression_status": {
         "prompt": (
             "How are the symptoms changing?\n"
             "1️⃣ Getting worse\n"
             "2️⃣ Staying the same\n"
             "3️⃣ Getting better\n"
-            "4️⃣ Comes and goes\n"
+            "4️⃣ Comes and goes\n\n"
             "Reply with 1, 2, 3, or 4."
         ),
         "options": {
             "1": "getting_worse", "getting worse": "getting_worse", "worse": "getting_worse",
-            "2": "staying_same",  "staying same": "staying_same",  "same": "staying_same",
+            "2": "staying_same",  "staying the same": "staying_same",  "same": "staying_same",
             "3": "getting_better","getting better": "getting_better","better": "getting_better",
             "4": "comes_and_goes","comes and goes": "comes_and_goes","on and off": "comes_and_goes",
         },
@@ -103,7 +142,7 @@ STRUCTURED_MENUS: Dict[str, Dict] = {
             "2️⃣ 1–3 days\n"
             "3️⃣ 4–7 days\n"
             "4️⃣ More than 1 week\n"
-            "5️⃣ More than 1 month\n"
+            "5️⃣ More than 1 month\n\n"
             "Reply with 1, 2, 3, 4, or 5."
         ),
         "options": {
@@ -120,7 +159,7 @@ STRUCTURED_MENUS: Dict[str, Dict] = {
             "1️⃣ Mild — can do normal activities\n"
             "2️⃣ Moderate — some difficulty with normal activities\n"
             "3️⃣ Severe — cannot do normal activities\n"
-            "4️⃣ Very severe — unable to move or respond normally\n"
+            "4️⃣ Very severe — unable to move or respond normally\n\n"
             "Reply with 1, 2, 3, or 4."
         ),
         "options": {
@@ -130,26 +169,12 @@ STRUCTURED_MENUS: Dict[str, Dict] = {
             "4": "very_severe", "very severe": "very_severe","very bad": "very_severe","critical": "very_severe",
         },
     },
-    "pregnancy_status": {
-        "prompt": (
-            "Is the patient currently pregnant?\n"
-            "1️⃣ Yes\n"
-            "2️⃣ No\n"
-            "3️⃣ Not sure\n"
-            "Reply with 1, 2, or 3."
-        ),
-        "options": {
-            "1": "yes",      "yes": "yes",      "pregnant": "yes",
-            "2": "no",       "no": "no",        "not pregnant": "no",
-            "3": "not_sure", "not sure": "not_sure", "unsure": "not_sure", "maybe": "not_sure",
-        },
-    },
     "condition_occurrence": {
         "prompt": (
             "Is this the first time experiencing this, or has it happened before?\n"
             "1️⃣ First time\n"
             "2️⃣ Has happened before\n"
-            "3️⃣ Long-term / ongoing condition\n"
+            "3️⃣ Long-term / ongoing condition\n\n"
             "Reply with 1, 2, or 3."
         ),
         "options": {
@@ -163,7 +188,7 @@ STRUCTURED_MENUS: Dict[str, Dict] = {
             "Does the patient have any known allergies?\n"
             "1️⃣ Yes\n"
             "2️⃣ No\n"
-            "3️⃣ Not sure\n"
+            "3️⃣ Not sure\n\n"
             "Reply with 1, 2, or 3."
         ),
         "options": {
@@ -172,11 +197,19 @@ STRUCTURED_MENUS: Dict[str, Dict] = {
             "3": "not_sure", "not sure": "not_sure","unsure": "not_sure",
         },
     },
+    "allergies_menu": {
+        "prompt": (
+            "Please list the patient's allergies (separated by commas):\n"
+            "e.g. peanuts, tree nuts, shellfish\n\n"
+            "Reply with a list of allergies."
+        ),
+        "options": {},
+    },
     "on_medication": {
         "prompt": (
             "Is the patient currently taking any medication?\n"
             "1️⃣ Yes\n"
-            "2️⃣ No\n"
+            "2️⃣ No\n\n"
             "Reply with 1 or 2."
         ),
         "options": {
@@ -188,7 +221,7 @@ STRUCTURED_MENUS: Dict[str, Dict] = {
         "prompt": (
             "Does the patient have any long-term health conditions? (e.g. diabetes, hypertension, asthma)\n"
             "1️⃣ Yes — please describe\n"
-            "2️⃣ No\n"
+            "2️⃣ No\n\n"
             "Reply with 1 or 2, then list any conditions."
         ),
         "options": {
@@ -203,7 +236,7 @@ STRUCTURED_MENUS: Dict[str, Dict] = {
             "• Anonymous data sharing for health records\n"
             "• Follow-up contact if needed\n\n"
             "1️⃣ Yes, I agree\n"
-            "2️⃣ No\n"
+            "2️⃣ No\n\n"
             "Reply with 1 or 2."
         ),
         "options": {
@@ -215,7 +248,7 @@ STRUCTURED_MENUS: Dict[str, Dict] = {
 
 # Fields that use structured menus (deterministic capture)
 STRUCTURED_FIELDS: Set[str] = {
-    "progression_status", "duration", "severity",
+    "age_group", "sex", "progression_status", "duration", "severity",
     "pregnancy_status", "condition_occurrence", "allergies",
     "on_medication", "consents",
 }
@@ -327,23 +360,23 @@ class MenuResolver:
         menu = STRUCTURED_MENUS.get(field) or STRUCTURED_MENUS.get(field + "_gate")
         if not menu:
             return False, None
-
+        
         t = user_text.strip().lower()
         options = menu["options"]
-
+        
         # Exact match first
         if t in options:
             return True, options[t]
-
+        
         # Check if response is just a number matching a menu option
         if re.match(r"^\d+$", t) and t in options:
             return True, options[t]
-
+        
         # Partial match for longer responses
         for key, value in options.items():
             if len(key) > 1 and key in t:
                 return True, value
-
+        
         return False, None
 
     @staticmethod
@@ -506,7 +539,12 @@ class ConversationalIntakeAgent:
         """Apply a deterministically-resolved menu value to extracted_info and update tracking."""
         info = state.extracted_info
 
-        if field == "progression_status":
+        if field == "age_group":
+            info.age_group = value
+            info.age_group_confidence = 1.0
+        elif field == "sex":
+            info.sex = value
+        elif field == "progression_status":
             info.progression_status = value
         elif field == "duration":
             info.duration = value
@@ -532,9 +570,9 @@ class ConversationalIntakeAgent:
         # Remove from missing_fields immediately
         field_aliases = {
             "chronic_conditions_gate": "chronic_conditions",
-        }
+        }  # <--- Added closing brace here
         resolved_field = field_aliases.get(field, field)
-
+        
         if resolved_field in state.missing_fields:
             state.missing_fields.remove(resolved_field)
 
@@ -925,7 +963,7 @@ class ConversationalIntakeAgent:
             red_flags["chest_indrawing"] = True
         if re.search(r"\b(heavy bleeding|bleeding a lot|hemorrhage)\b", t):
             red_flags["severe_bleeding"] = True
-        if re.search(r"\b(very pale|cold hands|collapsed|fainted)\b", t):
+        if re.search(r"\b(very pale|cold hands|collapsed|fainted|extremely weak|can't stand|dizzy|fainting|passed out)\b", t):
             red_flags["signs_of_shock"] = True
         if re.search(r"\b(unconscious|passed out|not waking|unresponsive)\b", t):
             red_flags["unconscious"] = True
@@ -950,17 +988,25 @@ class ConversationalIntakeAgent:
         Merge NLP-extracted info into existing state.
         Deterministically-captured fields (confidence == 1.0) are never overwritten.
         """
+        # Handle combined age/sex gate response
+        if new.age_group and new.sex and new.age_group_confidence == 1.0 and new.sex_confidence == 1.0:
+            # Combined response captured both age and sex
+            base.age_group = new.age_group
+            base.age_group_confidence = 1.0
+            base.sex = new.sex
+        else:
+            # Individual field handling
+            # Demographics
+            if new.age_group and new.age_group_confidence > base.age_group_confidence:
+                base.age_group            = new.age_group
+                base.age_group_confidence = new.age_group_confidence
+            if new.sex:              base.sex              = new.sex
+            if new.patient_relation: base.patient_relation = new.patient_relation
+
         # Complaint group — higher confidence wins
         if new.complaint_group and new.complaint_group_confidence > base.complaint_group_confidence:
             base.complaint_group            = new.complaint_group
             base.complaint_group_confidence = new.complaint_group_confidence
-
-        # Demographics
-        if new.age_group and new.age_group_confidence > base.age_group_confidence:
-            base.age_group            = new.age_group
-            base.age_group_confidence = new.age_group_confidence
-        if new.sex:              base.sex              = new.sex
-        if new.patient_relation: base.patient_relation = new.patient_relation
 
         # Severity — do NOT overwrite if captured deterministically (confidence == 1.0)
         if new.severity and base.severity_confidence < 1.0 and new.severity_confidence > base.severity_confidence:
@@ -1098,12 +1144,12 @@ class ConversationalIntakeAgent:
         missing = state.missing_fields
         asked   = set(state.asked_fields_history)
 
-        # Priority order for asking
+        # Priority order for asking - Clinical Priority First
         priority_order = [
-            "complaint_group", "severity", "duration", "age_group", "sex",
+            "age_group", "sex", "consents", "complaint_group", "severity", "duration",
             "progression_status", "condition_occurrence", "location", "village",
             "chronic_conditions", "on_medication", "allergies",
-            "pregnancy_status", "consents",
+            "pregnancy_status",
         ]
 
         # Exclude already-asked fields
@@ -1133,6 +1179,7 @@ class ConversationalIntakeAgent:
 
                 total     = len(CONVERSATIONAL_REQUIRED)
                 collected = total - len([f for f in CONVERSATIONAL_REQUIRED if f in state.missing_fields])
+                current_step = len([f for f in CONVERSATIONAL_REQUIRED if f not in state.missing_fields]) + 1
 
                 return {
                     "status":             "incomplete",
@@ -1142,7 +1189,7 @@ class ConversationalIntakeAgent:
                     "missing_fields":     state.missing_fields,
                     "active_menu_field":  next_field,
                     "extracted_so_far":   state.extracted_info.to_dict(),
-                    "progress":           f"{collected}/{total} fields collected",
+                    "progress":           f"Step {current_step} of {total}",
                     "patient_token":      state.patient_token,
                     "red_flags_detected": state.red_flags_detected,
                 }
@@ -1214,30 +1261,30 @@ class ConversationalIntakeAgent:
 
     def _get_empathy_prefix(self, state: ConversationState) -> str:
         """
-        Ask LLM for a single empathetic sentence acknowledging the last patient message.
-        Kept under 15 words to be brief. Returns empty string on failure.
+        Complaint-aware empathy templates - instant, no LLM calls.
+        Returns empty string if no conversation context.
         """
         if len(state.conversation_history) < 2:
             return ""
-        last_patient = next(
-            (m["content"] for m in reversed(state.conversation_history) if m["role"] == "patient"),
-            "",
-        )
-        if not last_patient:
-            return ""
-
-        from apps.triage.ml_models import _call_llm
-        prompt = (
-            f"Patient said: '{last_patient[:100]}'\n"
-            "Write ONE short empathetic sentence (under 15 words) acknowledging this. "
-            "Do not ask anything. Just acknowledge."
-        )
-        result = _call_llm(
-            "You are a warm medical triage assistant in Uganda. Be brief and kind.",
-            prompt,
-            max_tokens=40,
-        )
-        return result.strip() if result else ""
+        
+        complaint = state.extracted_info.complaint_group or "symptoms"
+        
+        # Empathy templates keyed by complaint group
+        empathy_templates = {
+            "fever": "I understand you're feeling feverish - that must be uncomfortable.",
+            "breathing": "Breathing difficulties can be worrying - I'm here to help.",
+            "injury": "Injuries need prompt attention - let's assess this carefully.",
+            "abdominal": "Abdominal pain can really disrupt your day - I understand.",
+            "headache": "Headaches can be debilitating - I'm here to help.",
+            "chest_pain": "Chest pain should always be taken seriously - I understand your concern.",
+            "pregnancy": "Pregnancy-related symptoms need special care - I'm here to help.",
+            "skin": "Skin issues can be very uncomfortable - I understand.",
+            "feeding": "Feeding issues can be distressing - I'm here to help.",
+            "bleeding": "Bleeding needs immediate attention - I understand your concern.",
+            "other": "I understand you're not feeling well - let's figure this out.",
+        }
+        
+        return empathy_templates.get(complaint, "I understand you're not feeling well - let's help.")
 
     def _build_complete(self, state: ConversationState) -> Dict[str, Any]:
         structured   = self._to_structured(state.extracted_info)

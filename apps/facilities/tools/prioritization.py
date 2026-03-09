@@ -60,27 +60,14 @@ class PrioritizationTool:
         Returns:
             Priority score (higher = more priority)
         """
-        score = 0.0
+        # THE MATCH SCORE ALREADY INCLUDES: distance (50%), capacity (25%), services (25%)
+        # So we just add minimal adjustments for clinical urgency
         
-        # 1. Base clinical urgency score
-        urgency_score = self._get_urgency_score(routing)
-        score += urgency_score
+        score = candidate.match_score  # Start with the comprehensive match score
         
-        # 2. Facility capability score
-        capability_score = self._get_capability_score(candidate, routing)
-        score += capability_score
-        
-        # 3. Availability score
-        availability_score = self._get_availability_score(candidate)
-        score += availability_score
-        
-        # 4. Distance penalty (closer is better)
-        distance_penalty = self._get_distance_penalty(candidate)
-        score -= distance_penalty
-        
-        # 5. Wait time penalty
-        wait_penalty = self._get_wait_time_penalty(candidate)
-        score -= wait_penalty
+        # Small boost for clinical urgency (only for high-risk/emergency cases)
+        if routing.risk_level == 'high' or routing.has_red_flags:
+            score += 0.1  # Small boost, won't override distance advantage
         
         return max(score, 0.0)
 
@@ -205,17 +192,8 @@ class PrioritizationTool:
         Returns:
             'automatic' or 'manual'
         """
-        # Automatic booking for high-risk and emergency cases
-        if routing.risk_level == 'high' or routing.has_red_flags:
-            return 'automatic'
-        
-        # Automatic for specific emergency symptoms
-        emergency_symptoms = ['chest_pain', 'difficulty_breathing', 'injury_trauma']
-        if routing.primary_symptom in emergency_symptoms:
-            return 'automatic'
-        
-        # Manual confirmation for medium and low risk cases
-        return 'manual'
+        # ALL bookings are now automatic - no manual confirmation required
+        return 'automatic'
 
     def get_top_candidates(self, candidates: List[FacilityCandidate], routing: FacilityRouting, max_count: int = 3) -> List[FacilityCandidate]:
         """

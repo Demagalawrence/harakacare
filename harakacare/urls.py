@@ -19,14 +19,17 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
+from apps.triage.admin import harakacare_admin
 
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
+    path('admin/', admin.site.urls),  # Default Django admin
+    path('harakacare-admin/', harakacare_admin.urls),  # Custom HarakaCare admin
+    path('api/', include('apps.messaging.api_urls')),  # Chat API endpoints
     path('api/facilities/', include('apps.facilities.urls')),
     path('api/v1/triage/', include('apps.triage.urls')),  # ADD THIS LINE
-    # path('messaging/', include('apps.messaging.urls')),  # Add this line    
-    # path("messaging/whatsapp/", include("apps.messaging.whatsapp.urls")),
+    path('messaging/', include('apps.messaging.urls')),  # Enable messaging endpoints
+    path("messaging/whatsapp/", include("apps.messaging.whatsapp.urls")),  # Enable WhatsApp endpoints
 
 ]
 

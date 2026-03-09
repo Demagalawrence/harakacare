@@ -1,0 +1,341 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block breadcrumbs %}{% endblock %}
+
+{% block content %}
+<div id="content-main" class="dashboard">
+    <!-- Dashboard Header -->
+    <div class="dashboard-header">
+        <h1>Clinical Dashboard Overview</h1>
+        <p class="dashboard-subtitle">Real-time triage metrics and case analytics</p>
+    </div>
+
+    <!-- Key Metrics Cards -->
+    <div class="metrics-grid">
+        <div class="metric-card clickable" data-url="{% url 'admin:triage_triage_changelist' %}?session_status__exact=started&amp;session_status__exact=in_progress&amp;session_status__exact=completed">
+            <div class="metric-number">{{ total_sessions_today }}</div>
+            <div class="metric-label">Total Triage Sessions Today</div>
+            <div class="metric-icon">📊</div>
+        </div>
+
+        <div class="metric-card high-risk clickable" data-url="{% url 'admin:triage_triage_changelist' %}?risk_level__exact=high">
+            <div class="metric-number">{{ high_risk_today }}</div>
+            <div class="metric-label">High Risk Cases Today</div>
+            <div class="metric-icon">⚠️</div>
+        </div>
+
+        <div class="metric-card emergency clickable" data-url="{% url 'admin:triage_triage_changelist' %}?redflagdetection__emergency_level__exact=emergency">
+            <div class="metric-number">{{ emergency_today }}</div>
+            <div class="metric-label">Emergency Cases Flagged Today</div>
+            <div class="metric-icon">🚨</div>
+        </div>
+
+        <div class="metric-card completed clickable" data-url="{% url 'admin:triage_triage_changelist' %}?session_status__exact=completed">
+            <div class="metric-number">{{ completed_this_week }}</div>
+            <div class="metric-label">Completed Assessments This Week</div>
+            <div class="metric-icon">✅</div>
+        </div>
+    </div>
+
+    <!-- Analytics Sections -->
+    <div class="analytics-grid">
+        <!-- District Breakdown -->
+        <div class="analytics-card">
+            <h3>Cases by District (Last 7 Days)</h3>
+            <div class="breakdown-list">
+                {% for item in district_breakdown %}
+                <div class="breakdown-item">
+                    <span class="breakdown-label">{{ item.district|title }}</span>
+                    <span class="breakdown-count">{{ item.count }}</span>
+                </div>
+                {% empty %}
+                <div class="no-data">No district data available</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Complaint Breakdown -->
+        <div class="analytics-card">
+            <h3>Cases by Complaint Group (Last 7 Days)</h3>
+            <div class="breakdown-list">
+                {% for item in complaint_breakdown %}
+                <div class="breakdown-item">
+                    <span class="breakdown-label">{{ item.complaint_group|title|replace:"_" " " }}</span>
+                    <span class="breakdown-count">{{ item.count }}</span>
+                </div>
+                {% empty %}
+                <div class="no-data">No complaint data available</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="quick-actions">
+        <h3>Quick Actions</h3>
+        <div class="actions-grid">
+            <a href="{% url 'admin:triage_triage_changelist' %}" class="action-btn">
+                <span class="action-icon">📋</span>
+                <span class="action-label">View All Sessions</span>
+            </a>
+            <a href="{% url 'admin:triage_tridgedecision_changelist' %}" class="action-btn">
+                <span class="action-icon">🏥</span>
+                <span class="action-label">View Decisions</span>
+            </a>
+            <a href="{% url 'admin:conversations_conversation_changelist' %}" class="action-btn">
+                <span class="action-icon">💬</span>
+                <span class="action-label">View Conversations</span>
+            </a>
+            <a href="{% url 'admin:auth_user_changelist' %}" class="action-btn">
+                <span class="action-icon">👥</span>
+                <span class="action-label">Manage Users</span>
+            </a>
+        </div>
+    </div>
+</div>
+
+<style>
+.dashboard {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.dashboard-header {
+    text-align: center;
+    margin-bottom: 40px;
+}
+
+.dashboard-header h1 {
+    color: #075e54;
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 10px;
+}
+
+.dashboard-subtitle {
+    color: #6c757d;
+    font-size: 1.1rem;
+    margin: 0;
+}
+
+.metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+    margin-bottom: 40px;
+}
+
+.metric-card {
+    background: white;
+    padding: 30px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    text-align: center;
+    position: relative;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.metric-card.clickable {
+    cursor: pointer;
+}
+
+.metric-card.clickable:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+}
+
+.metric-card.high-risk {
+    border-left: 4px solid #dc3545;
+}
+
+.metric-card.emergency {
+    border-left: 4px solid #fd7e14;
+}
+
+.metric-card.completed {
+    border-left: 4px solid #28a745;
+}
+
+.metric-number {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: #075e54;
+    margin-bottom: 8px;
+}
+
+.metric-label {
+    font-size: 1rem;
+    color: #6c757d;
+    font-weight: 500;
+}
+
+.metric-icon {
+    font-size: 2rem;
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    opacity: 0.3;
+}
+
+.analytics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    gap: 20px;
+    margin-bottom: 40px;
+}
+
+.analytics-card {
+    background: white;
+    padding: 30px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.analytics-card h3 {
+    color: #075e54;
+    font-size: 1.3rem;
+    font-weight: 600;
+    margin-bottom: 20px;
+    border-bottom: 2px solid #e9ecef;
+    padding-bottom: 10px;
+}
+
+.breakdown-list {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.breakdown-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid #f8f9fa;
+}
+
+.breakdown-item:last-child {
+    border-bottom: none;
+}
+
+.breakdown-label {
+    color: #495057;
+    font-weight: 500;
+    text-transform: capitalize;
+}
+
+.breakdown-count {
+    background: #075e54;
+    color: white;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.no-data {
+    text-align: center;
+    color: #6c757d;
+    font-style: italic;
+    padding: 40px 0;
+}
+
+.quick-actions {
+    background: white;
+    padding: 30px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.quick-actions h3 {
+    color: #075e54;
+    font-size: 1.3rem;
+    font-weight: 600;
+    margin-bottom: 20px;
+    border-bottom: 2px solid #e9ecef;
+    padding-bottom: 10px;
+}
+
+.actions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+}
+
+.action-btn {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 20px;
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    text-decoration: none;
+    color: #495057;
+    transition: all 0.2s ease;
+}
+
+.action-btn:hover {
+    background: #075e54;
+    color: white;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(7, 94, 84, 0.3);
+}
+
+.action-icon {
+    font-size: 1.5rem;
+}
+
+.action-label {
+    font-weight: 500;
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+    .dashboard {
+        padding: 15px;
+    }
+    
+    .dashboard-header h1 {
+        font-size: 2rem;
+    }
+    
+    .metrics-grid {
+        grid-template-columns: 1fr;
+        gap: 15px;
+    }
+    
+    .analytics-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .actions-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .metric-card {
+        padding: 20px;
+    }
+    
+    .metric-number {
+        font-size: 2rem;
+    }
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Handle metric card clicks
+    const clickableCards = document.querySelectorAll('.metric-card.clickable');
+    clickableCards.forEach(function(card) {
+        card.addEventListener('click', function() {
+            const url = this.getAttribute('data-url');
+            if (url) {
+                window.location.href = url;
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

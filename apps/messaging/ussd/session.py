@@ -25,6 +25,10 @@ class USSDSession:
             "symptom_severity": None,
             "symptom_duration": None,
             "district": None,
+            "village": None,
+            "allergies": None,
+            "chronic_conditions": None,
+            "on_medication": None,
             "pregnancy_status": None,
             "consent_given": False,
             "emergency_detected": False,
@@ -54,7 +58,7 @@ class USSDSession:
 class SessionManager:
     """Manages USSD sessions using Django cache."""
 
-    SESSION_TIMEOUT = 300  # 5 minutes (USSD sessions are short-lived)
+    SESSION_TIMEOUT = 1800  # 30 minutes (high timeout for USSD users)
 
     @staticmethod
     def get_session(session_id: str, phone_number: str) -> USSDSession:

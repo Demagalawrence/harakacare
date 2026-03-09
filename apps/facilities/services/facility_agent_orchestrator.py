@@ -347,6 +347,45 @@ class FacilityAgentOrchestrator:
             response_received_at=timezone.now()
         )
         
+        # TRIGGER WHATSAPP BOOKING CONFIRMATION
+        try:
+            from apps.messaging.whatsapp.whatsapp_handler import WhatsAppHandler
+            
+            # Get patient phone number from triage session
+            from apps.triage.models import TriageSession
+            triage_session = TriageSession.objects.filter(patient_token=routing.patient_token).first()
+            
+            if triage_session and triage_session.patient_phone_number:
+                phone = triage_session.patient_phone_number
+                
+                # Generate realistic appointment time (tomorrow morning)
+                tomorrow = timezone.now() + timedelta(days=1)
+                appointment_date = tomorrow.strftime("%A, %d %B %Y")
+                appointment_time = "9:00 AM"
+                
+                # Send booking confirmation via WhatsApp
+                whatsapp_handler = WhatsAppHandler()
+                booking_message = (
+                    f"✅ *Booking Confirmed*\n\n"
+                    f"🏥 *Facility:* {facility.name}\n"
+                    f"📅 *Date:* {appointment_date}\n"
+                    f"🕐 *Time:* {appointment_time}\n\n"
+                    f"📍 *Please arrive 15 minutes before your appointment.*\n\n"
+                    f"📞 *Facility Contact:* {facility.phone_number}\n"
+                    f"📍 *Address:* {facility.address}\n\n"
+                    f"📞 *Need to reschedule?* Reply 'reschedule' or call facility directly.\n\n"
+                    f"🔑 *Reference:* {routing.patient_token}\n\n"
+                    f"_⚕️ Bring your ID and any relevant medical records._"
+                )
+                whatsapp_handler._send(phone, booking_message)
+                
+                logger.info(f"WhatsApp booking confirmation sent to {phone} for {routing.patient_token}")
+            else:
+                logger.warning(f"No phone number found for patient {routing.patient_token}")
+                
+        except Exception as e:
+            logger.error(f"Failed to send WhatsApp booking confirmation for {routing.patient_token}: {e}")
+        
         return notification
 
     def _handle_facility_confirmation(self, routing: FacilityRouting, 
