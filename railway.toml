@@ -1,0 +1,32 @@
+# Railway Deployment Configuration
+
+[build]
+builder = "NIXPACKS"
+
+[deploy]
+healthcheckPath = "/api/"
+healthcheckTimeout = 100
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10
+
+[env]
+DJANGO_SETTINGS_MODULE = "harakacare.settings.production"
+DEBUG = "False"
+ALLOWED_HOSTS = ".railway.app,localhost,127.0.0.1"
+CORS_ALLOWED_ORIGINS = "https://your-vercel-domain.vercel.app,https://localhost:3000"
+
+# Database (Railway provides PostgreSQL)
+DATABASE_URL = "${{RAILWAY_DATABASE_URL}}"
+
+# Redis (if using Railway Redis)
+REDIS_URL = "${{RAILWAY_REDIS_URL}}"
+
+# Security
+SECRET_KEY = "${{RAILWAY_SECRET_KEY}}"
+
+# Static files
+USE_S3 = "True"
+AWS_ACCESS_KEY_ID = "${{AWS_ACCESS_KEY_ID}}"
+AWS_SECRET_ACCESS_KEY = "${{AWS_SECRET_ACCESS_KEY}}"
+AWS_STORAGE_BUCKET_NAME = "${{AWS_STORAGE_BUCKET_NAME}}"
+AWS_S3_REGION_NAME = "${{AWS_S3_REGION_NAME}}"

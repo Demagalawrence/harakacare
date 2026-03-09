@@ -2,7 +2,15 @@ import axios from 'axios';
 
 // const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://127.0.0.1:8001/api';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || '/api';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 
+  (window.location.hostname.includes('vercel.app') 
+    ? 'https://harakacare.onrender.com/api' 
+    : (window.location.hostname === 'localhost' 
+      ? 'http://localhost:8001/api' 
+      : '/api'));
+
+// Debug: Log the API URL being used
+console.log('API Base URL:', API_BASE_URL);
 
 const api = axios.create({
   baseURL: API_BASE_URL,

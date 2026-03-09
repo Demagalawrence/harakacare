@@ -81,6 +81,7 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = 'harakacare.urls'
+WSGI_APPLICATION = 'harakacare.wsgi.application'
 
 TEMPLATES = [
     {

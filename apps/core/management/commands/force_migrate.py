@@ -1,0 +1,170 @@
+from django.core.management.base import BaseCommand
+from django.db import connection
+from django.core.management import call_command
+
+
+class Command(BaseCommand):
+    help = 'Force migrate all apps and create missing tables'
+
+    def handle(self, *args, **options):
+        self.stdout.write('Force migrating all apps...')
+        
+        # Reset migration history for triage app only
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute("DELETE FROM django_migrations WHERE app = 'triage'")
+                self.stdout.write('Reset triage migration history')
+        except Exception as e:
+            self.stdout.write(f'Error resetting migration history: {e}')
+        
+        # Run migrations for all apps
+        try:
+            call_command('migrate', app_label='triage', verbosity=2)
+            self.stdout.write(self.style.SUCCESS('Triage migrations completed!'))
+            
+            call_command('migrate', app_label='facilities', verbosity=2)
+            self.stdout.write(self.style.SUCCESS('Facilities migrations completed!'))
+            
+            call_command('migrate', app_label='patients', verbosity=2)
+            self.stdout.write(self.style.SUCCESS('Patients migrations completed!'))
+            
+            call_command('migrate', app_label='auth', verbosity=2)
+            self.stdout.write(self.style.SUCCESS('Auth migrations completed!'))
+            
+        except Exception as e:
+            self.stdout.write(self.style.ERROR(f'Migration failed: {e}'))
+        
+        # Create all required tables manually (same as API endpoint)
+        with connection.cursor() as cursor:
+            # Create triage_villagecoordinates table
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS triage_villagecoordinates (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    village VARCHAR(100) NOT NULL,
+                    district VARCHAR(100) NOT NULL,
+                    latitude REAL NOT NULL,
+                    longitude REAL NOT NULL,
+                    last_updated DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    lookup_count INTEGER DEFAULT 1
+                )
+            """)
+            
+            # Create index if it doesn't exist
+            cursor.execute("""
+                CREATE UNIQUE INDEX IF NOT EXISTS triage_vill_village_79ec71_idx 
+                ON triage_villagecoordinates(village, district)
+            """)
+            
+            # Create triage_triagecase table
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS triage_triagecase (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    patient_token VARCHAR(50) UNIQUE NOT NULL,
+                    age_group VARCHAR(50) NOT NULL,
+                    sex VARCHAR(10) NOT NULL,
+                    district VARCHAR(100) NOT NULL,
+                    village VARCHAR(100),
+                    complaint_group VARCHAR(100),
+                    patient_relation VARCHAR(50),
+                    consent_medical_triage BOOLEAN NOT NULL,
+                    consent_data_sharing BOOLEAN NOT NULL,
+                    consent_follow_up BOOLEAN NOT NULL,
+                    location_consent BOOLEAN DEFAULT FALSE,
+                    complaint_text TEXT,
+                    device_location_lat REAL,
+                    device_location_lng REAL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            
+            # Drop and recreate triage_triagesession table with all columns
+            cursor.execute("DROP TABLE IF EXISTS triage_triagesession")
+            cursor.execute("""
+                CREATE TABLE triage_triagesession (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    patient_token VARCHAR(50) NOT NULL,
+                    session_data TEXT,
+                    current_step INTEGER DEFAULT 1,
+                    is_completed BOOLEAN DEFAULT FALSE,
+                    is_active BOOLEAN DEFAULT TRUE,
+                    status VARCHAR(50) DEFAULT 'active',
+                    status_changed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    status_reason TEXT,
+                    created_by_id INTEGER,
+                    updated_by_id INTEGER,
+                    patient_phone TEXT,
+                    patient_phone_number TEXT,
+                    geocoding_display_name TEXT,
+                    geocoding_accuracy REAL,
+                    geocoding_confidence REAL,
+                    geocoding_method TEXT,
+                    geocoding_source TEXT,
+                    location_accuracy REAL,
+                    location_method TEXT,
+                    location_timestamp DATETIME,
+                    geocoding_raw_response TEXT,
+                    geocoding_processed_at DATETIME,
+                    geocoding_provider TEXT,
+                    geocoding_version TEXT,
+                    geocoding_cache_hit BOOLEAN DEFAULT FALSE,
+                    geocoding_query TEXT,
+                    geocoding_admin_level TEXT,
+                    geocoding_postal_code TEXT,
+                    geocoding_country TEXT,
+                    geocoding_country_code TEXT,
+                    geocoding_state TEXT,
+                    geocoding_county TEXT,
+                    geocoding_city TEXT,
+                    geocoding_suburb TEXT,
+                    geocoding_neighbourhood TEXT,
+                    geocoding_road TEXT,
+                    geocoding_house_number TEXT,
+                    geocoding_latitude REAL,
+                    geocoding_longitude REAL,
+                    session_status VARCHAR(50) DEFAULT 'active',
+                    complaint_text TEXT,
+                    complaint_group VARCHAR(100),
+                    age_group VARCHAR(50),
+                    sex VARCHAR(10),
+                    patient_relation VARCHAR(50),
+                    symptom_indicators TEXT,
+                    symptom_severity TEXT,
+                    symptom_duration TEXT,
+                    progression_status TEXT,
+                    red_flag_indicators TEXT,
+                    has_red_flags BOOLEAN DEFAULT FALSE,
+                    red_flag_detected_at_turn INTEGER,
+                    risk_modifiers TEXT,
+                    pregnancy_status TEXT,
+                    has_chronic_conditions BOOLEAN DEFAULT FALSE,
+                    on_medication BOOLEAN DEFAULT FALSE,
+                    district VARCHAR(100),
+                    subcounty VARCHAR(100),
+                    village VARCHAR(100),
+                    device_location_lat REAL,
+                    device_location_lng REAL,
+                    location_consent BOOLEAN DEFAULT FALSE,
+                    primary_symptom VARCHAR(100),
+                    secondary_symptoms TEXT,
+                    red_flags TEXT,
+                    chronic_conditions TEXT,
+                    additional_description TEXT,
+                    consent_medical_triage BOOLEAN DEFAULT FALSE,
+                    consent_data_sharing BOOLEAN DEFAULT FALSE,
+                    consent_follow_up BOOLEAN DEFAULT FALSE,
+                    risk_level VARCHAR(50),
+                    risk_confidence REAL,
+                    follow_up_priority VARCHAR(50),
+                    ai_model_version VARCHAR(50),
+                    assessment_completed_at DATETIME,
+                    forwarded_to_followup BOOLEAN DEFAULT FALSE,
+                    forwarded_to_facility BOOLEAN DEFAULT FALSE,
+                    channel VARCHAR(50),
+                    conversation_turns INTEGER DEFAULT 0,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            
+        self.stdout.write(self.style.SUCCESS('✅ All triage tables created successfully!'))
