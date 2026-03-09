@@ -44,6 +44,13 @@ CORS_ALLOWED_ORIGINS = os.environ.get('CORS_ALLOWED_ORIGINS', '').split(',') if 
     'https://127.0.0.1:3000',
 ]
 
+# Allow all Vercel subdomains using pattern matching
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r'^https://.*-demagalawrences-projects\.vercel\.app$',
+    r'^https://harakacare-frontend-.*\.vercel\.app$',
+    r'^https://.*\.vercel\.app$',  # Allow all Vercel subdomains
+]
+
 # Allow all origins for development
 CORS_ALLOW_ALL_ORIGINS = DEBUG  # Allow all origins when DEBUG=True
 CORS_ALLOW_CREDENTIALS = True
