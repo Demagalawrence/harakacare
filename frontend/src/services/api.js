@@ -6,7 +6,7 @@ const API_BASE_URL = process.env.REACT_APP_API_URL ||
   (window.location.hostname.includes('vercel.app') 
     ? 'https://harakacare.onrender.com/api' 
     : (window.location.hostname === 'localhost' 
-      ? 'http://localhost:8001/api' 
+      ? 'https://harakacare.onrender.com/api'  // Use deployed backend even when testing locally
       : '/api'));
 
 // Debug: Log the API URL being used

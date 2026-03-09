@@ -8,6 +8,7 @@ const PatientTriage = () => {
     age_group: '', // Changed from age_group
     sex: '',
     district: '',
+    village: '', // Added missing village field
     subCounty: '',
     primarySymptom: '',
     secondarySymptoms: [],
