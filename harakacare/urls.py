@@ -19,17 +19,35 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
+from django.http import JsonResponse
 from apps.triage.admin import harakacare_admin
 
+def api_info(request):
+    """HarakaCare API Information"""
+    return JsonResponse({
+        "name": "HarakaCare API",
+        "version": "1.0.0",
+        "status": "active",
+        "endpoints": {
+            "chat": "/api/v1/chat/",
+            "facilities": "/api/facilities/",
+            "triage": "/api/v1/triage/",
+            "admin": "/harakacare-admin/",
+            "django_admin": "/admin/"
+        },
+        "description": "Healthcare triage and facility management system"
+    })
+
 urlpatterns = [
+    path('', api_info, name='api_info'),  # API info at root
     path('admin/', admin.site.urls),  # Default Django admin
     path('harakacare-admin/', harakacare_admin.urls),  # Custom HarakaCare admin
     path('api/', include('apps.messaging.api_urls')),  # Chat API endpoints
     path('api/facilities/', include('apps.facilities.urls')),  # Facility API endpoints
     path('api/v1/triage/', include('apps.triage.urls')),  # Triage API endpoints
-    # Temporarily disabled WhatsApp endpoints - need META_WHATSAPP_ACCESS_TOKEN
-    # path('messaging/', include('apps.messaging.urls')),  # Messaging endpoints
-    # path("messaging/whatsapp/", include("apps.messaging.whatsapp.urls")),  # WhatsApp endpoints
+    # Re-enabled messaging endpoints with error handling for missing credentials
+    path('messaging/', include('apps.messaging.urls')),  # Messaging endpoints
+    path("messaging/whatsapp/", include("apps.messaging.whatsapp.urls")),  # WhatsApp endpoints
 ]
 
 # Add debug toolbar URLs in development

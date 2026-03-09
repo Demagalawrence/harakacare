@@ -221,4 +221,11 @@ class DialogAPIError(Exception):
 
 
 # Singleton instance for reuse across the application
-dialog_client = DialogClient()
+try:
+    dialog_client = DialogClient()
+except ValueError as e:
+    print(f"⚠️  WhatsApp client not initialized: {e}")
+    dialog_client = None
+except Exception as e:
+    print(f"⚠️  WhatsApp client initialization failed: {e}")
+    dialog_client = None

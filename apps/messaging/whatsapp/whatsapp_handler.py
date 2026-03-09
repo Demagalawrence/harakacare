@@ -74,13 +74,21 @@ class WhatsAppHandler:
     """
 
     def __init__(self):
-        self.client = DialogClient()
+        try:
+            self.client = DialogClient()
+        except (ValueError, Exception) as e:
+            logger.warning(f"WhatsApp client not available: {e}")
+            self.client = None
         self.agent  = ConversationalIntakeAgent()
 
     # ── Entry point ────────────────────────────────────────────────────────────
 
     def handle(self, phone: str, message_text: str, message_id: str) -> None:
         logger.info(f"WA | phone={phone} msg={message_text[:80]!r}")
+
+        if not self.client:
+            logger.warning("WhatsApp client not available - cannot process message")
+            return
 
         try:
             self.client.mark_as_read(phone, message_id)
