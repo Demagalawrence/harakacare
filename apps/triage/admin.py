@@ -898,8 +898,12 @@ class FacilityCapacityLogAdmin(ModelAdmin):
     change_info.short_description = 'Bed Change'
 
 
-# Call the function when admin is loaded
-create_admin_groups()
+# Call the function when admin is loaded - with error handling
+try:
+    create_admin_groups()
+except Exception as e:
+    print(f"⚠️  Could not create admin groups on startup: {e}")
+    # Don't fail deployment - groups will be created when needed
 
 
 # ============================================================================
