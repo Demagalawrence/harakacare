@@ -27,8 +27,9 @@ urlpatterns = [
     path('api/', include('apps.messaging.api_urls')),  # Chat API endpoints
     path('api/facilities/', include('apps.facilities.urls')),  # Facility API endpoints
     path('api/v1/triage/', include('apps.triage.urls')),  # Triage API endpoints
-    path('messaging/', include('apps.messaging.urls')),  # Messaging endpoints
-    path("messaging/whatsapp/", include("apps.messaging.whatsapp.urls")),  # WhatsApp endpoints
+    # Temporarily disabled WhatsApp endpoints - need META_WHATSAPP_ACCESS_TOKEN
+    # path('messaging/', include('apps.messaging.urls')),  # Messaging endpoints
+    # path("messaging/whatsapp/", include("apps.messaging.whatsapp.urls")),  # WhatsApp endpoints
 ]
 
 # Add debug toolbar URLs in development
