@@ -1,72 +1,97 @@
 """
-360dialog WhatsApp API Client
-Handles all outbound messaging to WhatsApp via 360dialog's WABA API.
+Meta WhatsApp Cloud API Client
+Handles all outbound messaging to WhatsApp via Meta's Cloud API.
+Updated from 360dialog to Meta WhatsApp Cloud API.
 """
 
 import logging
-from typing import Any, Dict, List, Optional
-
+import json
 import requests
+from typing import Any, Dict, List, Optional
 from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
-# 360dialog base URL — use sandbox URL in development
-WABA_BASE_URL = getattr(settings, "THREESIXTY_DIALOG_BASE_URL", "https://waba.360dialog.io")
-WABA_API_KEY  = getattr(settings, "THREESIXTY_DIALOG_API_KEY", "")
+# Meta WhatsApp Cloud API configuration
+META_WHATSAPP_API_VERSION = "v18.0"
+META_WHATSAPP_BASE_URL = getattr(settings, "META_WHATSAPP_BASE_URL", "https://graph.facebook.com")
+META_WHATSAPP_PHONE_NUMBER_ID = getattr(settings, "META_WHATSAPP_PHONE_NUMBER_ID", "")
+META_WHATSAPP_ACCESS_TOKEN = getattr(settings, "META_WHATSAPP_ACCESS_TOKEN", "")
 
 # Timeout for outbound requests (seconds)
-REQUEST_TIMEOUT = 15
+REQUEST_TIMEOUT = 30
 
 
 class DialogClient:
     """
-    Thin wrapper around the 360dialog WABA REST API.
-
-    All send_* methods return the raw JSON response dict on success,
+    Wrapper around Meta WhatsApp Cloud API.
+    Updated from 360dialog to Meta WhatsApp Cloud API.
+    
+    All send_* methods return raw JSON response dict on success,
     or raise DialogAPIError on failure.
     """
 
-    def __init__(self, api_key: str = WABA_API_KEY, base_url: str = WABA_BASE_URL):
-        if not api_key:
+    def __init__(self, 
+                 access_token: str = META_WHATSAPP_ACCESS_TOKEN,
+                 phone_number_id: str = META_WHATSAPP_PHONE_NUMBER_ID,
+                 base_url: str = META_WHATSAPP_BASE_URL,
+                 api_version: str = META_WHATSAPP_API_VERSION):
+        if not access_token:
             raise ValueError(
-                "360dialog API key is not set. "
-                "Add THREESIXTY_DIALOG_API_KEY to your Django settings."
+                "Meta WhatsApp access token is not set. "
+                "Add META_WHATSAPP_ACCESS_TOKEN to your Django settings."
             )
+        if not phone_number_id:
+            raise ValueError(
+                "Meta WhatsApp phone number ID is not set. "
+                "Add META_WHATSAPP_PHONE_NUMBER_ID to your Django settings."
+            )
+        
         self.base_url = base_url.rstrip("/")
+        self.api_version = api_version
+        self.phone_number_id = phone_number_id
+        self.access_token = access_token
+        
         self.session = requests.Session()
         self.session.headers.update({
-            "D360-API-KEY": api_key,
+            "Authorization": f"Bearer {access_token}",
             "Content-Type": "application/json",
         })
 
+    def _make_request(self, method: str, endpoint: str, **kwargs) -> Dict[str, Any]:
+        """Make HTTP request to Meta API with error handling."""
+        url = f"{self.base_url}/{self.api_version}/{endpoint}"
+        
+        try:
+            response = self.session.request(
+                method=method,
+                url=url,
+                timeout=REQUEST_TIMEOUT,
+                **kwargs
+            )
+            response.raise_for_status()
+            
+            result = response.json()
+            logger.info(f"Meta API {method} {endpoint}: {result}")
+            return result
+            
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Meta API request failed: {e}")
+            raise DialogAPIError(f"Request failed: {e}")
+        except json.JSONDecodeError as e:
+            logger.error(f"Meta API response decode failed: {e}")
+            raise DialogAPIError(f"Invalid JSON response: {e}")
+
     # ------------------------------------------------------------------
-    # Core sending
+    # Core sending methods
     # ------------------------------------------------------------------
 
     def send_message(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """
-        POST /v1/messages with an arbitrary payload.
-        Returns the API response dict.
+        Send a message to WhatsApp user.
+        Updated for Meta WhatsApp Cloud API format.
         """
-        url = f"{self.base_url}/v1/messages"
-        try:
-            resp = self.session.post(url, json=payload, timeout=REQUEST_TIMEOUT)
-            resp.raise_for_status()
-            data = resp.json()
-            logger.debug(f"360dialog response: {data}")
-            return data
-        except requests.exceptions.HTTPError as exc:
-            body = exc.response.text if exc.response else "(no body)"
-            logger.error(f"360dialog HTTP error: {exc.response.status_code} — {body}")
-            raise DialogAPIError(f"HTTP {exc.response.status_code}: {body}") from exc
-        except requests.exceptions.RequestException as exc:
-            logger.error(f"360dialog request failed: {exc}")
-            raise DialogAPIError(str(exc)) from exc
-
-    # ------------------------------------------------------------------
-    # Convenience helpers
-    # ------------------------------------------------------------------
+        return self._make_request("POST", f"{self.phone_number_id}/messages", json=payload)
 
     def send_text(self, to: str, body: str, preview_url: bool = False) -> Dict[str, Any]:
         """Send a plain-text WhatsApp message."""
@@ -191,4 +216,9 @@ class DialogClient:
 
 
 class DialogAPIError(Exception):
-    """Raised when the 360dialog API returns an error."""
+    """Raised when the Meta WhatsApp API returns an error."""
+    pass
+
+
+# Singleton instance for reuse across the application
+dialog_client = DialogClient()

@@ -14,6 +14,41 @@ class Facility(models.Model):
     and other healthcare service providers.
     """
     
+    # Standardized medical services choices
+    MEDICAL_SERVICES_CHOICES = [
+        ('emergency', 'Emergency Medicine'),
+        ('general_medicine', 'General Medicine'),
+        ('surgery', 'Surgery'),
+        ('obstetrics', 'Obstetrics & Gynecology'),
+        ('pediatrics', 'Pediatrics'),
+        ('mental_health', 'Mental Health Services'),
+        ('diagnostics', 'Diagnostic Services'),
+        ('pharmacy', 'Pharmacy Services'),
+        ('laboratory', 'Laboratory Services'),
+        ('radiology', 'Radiology/Imaging'),
+        ('dental', 'Dental Services'),
+        ('ophthalmology', 'Eye Care Services'),
+        ('cardiology', 'Cardiology Services'),
+        ('orthopedics', 'Orthopedic Services'),
+        ('dermatology', 'Dermatology'),
+        ('hiv_aids', 'HIV/AIDS Care'),
+        ('malaria', 'Malaria Treatment'),
+        ('tb_treatment', 'Tuberculosis Treatment'),
+        ('maternal_health', 'Maternal Health Services'),
+        ('child_health', 'Child Health Services'),
+        ('immunization', 'Immunization Services'),
+        ('nutrition', 'Nutrition Services'),
+        ('rehabilitation', 'Rehabilitation Services'),
+        ('palliative_care', 'Palliative Care'),
+        ('community_health', 'Community Health Services'),
+        ('occupational_health', 'Occupational Health'),
+        ('telemedicine', 'Telemedicine Services'),
+        ('blood_bank', 'Blood Bank Services'),
+        ('ambulance', 'Ambulance Services'),
+        ('counselling', 'Counselling Services'),
+    ]
+    
+    # Facility type choices
     FACILITY_TYPES = [
         ('hospital', 'Hospital'),
         ('clinic', 'Clinic'),
@@ -27,7 +62,9 @@ class Facility(models.Model):
         User,
         on_delete=models.CASCADE,
         related_name='facility',
-        help_text='Django user account linked to this facility'
+        help_text='Django user account linked to this facility',
+        null=True,
+        blank=True
     )
     
     name = models.CharField(
@@ -108,12 +145,12 @@ class Facility(models.Model):
         help_text='Number of medical staff on duty'
     )
     
-    # Services offered
+    # Services offered (multi-select)
     services_offered = models.JSONField(
         'services offered',
         default=list,
         blank=True,
-        help_text='List of medical services offered at the facility'
+        help_text='Select medical services offered at the facility (choose from standardized list)'
     )
     
     # Operational data
@@ -180,6 +217,17 @@ class Facility(models.Model):
     def offers_service(self, service):
         """Check if facility offers a specific service"""
         return service in self.services_offered
+    
+    def validate_services(self):
+        """Validate that all services are from the standardized list"""
+        valid_services = [choice[0] for choice in self.MEDICAL_SERVICES_CHOICES]
+        invalid_services = [s for s in self.services_offered if s not in valid_services]
+        return invalid_services
+    
+    def get_services_display(self):
+        """Get human-readable display of services"""
+        service_dict = dict(self.MEDICAL_SERVICES_CHOICES)
+        return [service_dict.get(service, service) for service in self.services_offered]
     
     def can_handle_emergency(self):
         """

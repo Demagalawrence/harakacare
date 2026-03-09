@@ -1,0 +1,94 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block extrastyle %}
+{{ block.super }}
+<style>
+    /* HarakaCare Admin Branding */
+    #header {
+        background: #075e54 !important;
+        border-bottom: none !important;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    #branding h1, #branding h1 a:link, #branding h1 a:visited {
+        color: white !important;
+        font-weight: 700;
+        font-size: 1.8rem;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    #branding h1:before {
+        content: "🏥";
+        font-size: 1.5rem;
+    }
+
+    #user-tools {
+        color: rgba(255,255,255,0.9) !important;
+    }
+
+    #user-tools a {
+        color: white !important;
+        font-weight: 500;
+    }
+
+    #user-tools a:hover {
+        background: rgba(255,255,255,0.1);
+        border-radius: 4px;
+    }
+
+    .module h2, .module caption, .inline-group h2 {
+        background: #075e54 !important;
+        color: white !important;
+    }
+
+    .module th, .module caption {
+        background: #075e54 !important;
+    }
+
+    div.breadcrumbs {
+        background: #f8f9fa;
+        border-bottom: 1px solid #e9ecef;
+        padding: 12px 20px;
+    }
+
+    div.breadcrumbs a {
+        color: #075e54;
+        font-weight: 500;
+    }
+
+    div.breadcrumbs a:hover {
+        color: #054d44;
+    }
+
+    /* Remove Django branding */
+    #footer {
+        display: none;
+    }
+
+    /* Custom styling for clinical dashboard */
+    .dashboard {
+        background: #f8f9fa;
+        min-height: calc(100vh - 60px);
+    }
+
+    /* Mobile responsive adjustments */
+    @media (max-width: 768px) {
+        #branding h1 {
+            font-size: 1.4rem;
+        }
+        
+        #user-tools {
+            font-size: 0.9rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block branding %}
+<h1 id="site-name"><a href="{% url 'admin:index' %}">HarakaCare Clinical Dashboard</a></h1>
+{% endblock %}
+
+{% block nav-global %}{% endblock %}

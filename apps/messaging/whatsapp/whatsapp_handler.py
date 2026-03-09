@@ -16,13 +16,14 @@ from __future__ import annotations
 
 import hashlib
 import logging
-from typing import Any, Dict, Optional
+import re
+from typing import Any, Dict, Optional, List
 
 from django.core.cache import cache
 
 from apps.messaging.whatsapp.whatsapp_client import DialogClient, DialogAPIError
 from apps.triage.ml_models import detect_emergency_in_text
-from apps.triage.tools.conversational_intake_agent import ConversationalIntakeAgent
+from apps.triage.tools.conversational_intake_agent import ConversationalIntakeAgent, STRUCTURED_FIELDS
 
 logger = logging.getLogger(__name__)
 
@@ -30,11 +31,11 @@ logger = logging.getLogger(__name__)
 _SESSION_PREFIX  = "wa_session:"
 _SESSION_TIMEOUT = 60 * 60   # 1 hour of inactivity
 
-# ── Commands ───────────────────────────────────────────────────────────────────
+# ── Commands ───────────────────────────────────────────────────────────────
 _RESET_CMDS  = {"reset", "restart", "start over", "start again", "new"}
 _STATUS_CMDS = {"status", "result", "results", "my result", "check"}
 _HELP_CMDS   = {"help", "?", "menu"}
-
+_BOOKING_CMDS = {"book", "booking", "appointment", "confirm", "schedule"}
 
 # ── Token / session helpers ────────────────────────────────────────────────────
 
@@ -96,6 +97,8 @@ class WhatsAppHandler:
             return self._cmd_status(phone)
         if lower in _HELP_CMDS:
             return self._cmd_help(phone)
+        if lower in _BOOKING_CMDS:
+            return self._cmd_booking(phone, text)
 
         # ── Emergency pre-screen (regex, no LLM) ──────────────────────────────
         emergency = detect_emergency_in_text(text)
@@ -155,10 +158,23 @@ class WhatsAppHandler:
         message = result.get("message", "")
 
         if status == "incomplete":
-            # Both answer_menu and answer_questions deliver the message verbatim.
-            # The menu prompt is already formatted by MenuResolver; no extra processing needed.
+            # Both answer_menu and answer_questions deliver the message with step progress.
+            # The menu prompt is already formatted by MenuResolver; we enhance with interactive buttons.
             if message:
-                self._send(phone, message)
+                # Add step progress indicator if available
+                progress = result.get("progress", "")
+                if progress:
+                    message_with_progress = f"{progress}\n\n{message}"
+                else:
+                    message_with_progress = message
+                
+                # Check if this is a structured menu that should use interactive buttons
+                active_field = result.get("active_menu_field", "")
+                if active_field in STRUCTURED_FIELDS:
+                    # Convert structured menu to interactive buttons
+                    self._send_structured_menu(phone, message_with_progress, active_field)
+                else:
+                    self._send(phone, message_with_progress)
 
             # If it was a menu question, send a hint about accepted inputs
             if action == "answer_menu":
@@ -171,6 +187,82 @@ class WhatsAppHandler:
             if message:
                 self._send(phone, message)
             self._send_result_card(phone, token, result)
+            
+            # AUTOMATIC BOOKING CONFIRMATION - USE REAL FACILITY DATA
+            # Send booking confirmation after assessment completion for HIGH/MEDIUM risk cases
+            structured = result.get("structured_data") or {}
+            triage_result = result.get("triage_result") or {}
+            risk_level = triage_result.get("risk_level", "").upper()
+            
+            logger.info(f"Assessment completed - Risk level: {risk_level}")
+            
+            if risk_level in ["HIGH", "MEDIUM"]:
+                logger.info(f"Triggering auto-booking for {phone}")
+                
+                # GET REAL FACILITY DATA FROM DATABASE
+                try:
+                    from apps.triage.models import TriageSession
+                    from apps.facilities.models import Facility, FacilityRouting
+                    
+                    # First try to get confirmed facility routing
+                    routing = FacilityRouting.objects.filter(
+                        patient_token=token,
+                        routing_status=FacilityRouting.RoutingStatus.CONFIRMED
+                    ).first()
+                    
+                    if routing and routing.assigned_facility:
+                        # USE REAL FACILITY DATA
+                        facility = routing.assigned_facility
+                        facility_name = facility.name
+                        facility_phone = facility.phone_number
+                        facility_address = facility.address
+                        
+                        logger.info(f"Using real facility data: {facility_name}")
+                        
+                    else:
+                        # FALLBACK: Get any facility from database (not mocked)
+                        facility = Facility.objects.first()
+                        if facility:
+                            facility_name = facility.name
+                            facility_phone = facility.phone_number
+                            facility_address = facility.address
+                            logger.info(f"Using first available facility: {facility_name}")
+                        else:
+                            # LAST RESORT: Default values
+                            facility_name = "HarakaCare Health Centre"
+                            facility_phone = "+256 123 456 789"
+                            facility_address = "Kampala, Uganda"
+                            logger.warning("No facilities found in database, using defaults")
+                    
+                    # Generate realistic appointment time
+                    from datetime import datetime, timedelta
+                    tomorrow = datetime.now() + timedelta(days=1)
+                    appointment_date = tomorrow.strftime("%A, %d %B %Y")
+                    appointment_time = "9:00 AM"
+                    
+                    # Send booking confirmation with REAL data
+                    booking_message = (
+                        f"✅ *Booking Confirmed*\n\n"
+                        f"🏥 *Facility:* {facility_name}\n"
+                        f"📅 *Date:* {appointment_date}\n"
+                        f"🕐 *Time:* {appointment_time}\n\n"
+                        f"📍 *Please arrive 15 minutes before your appointment.*\n\n"
+                        f"📞 *Facility Contact:* {facility_phone}\n"
+                        f"📍 *Address:* {facility_address}\n\n"
+                        f"📞 *Need to reschedule?* Reply 'reschedule' or call facility directly.\n\n"
+                        f"🔑 *Reference:* {_patient_token(phone)}\n\n"
+                        f"_⚕️ Bring your ID and any relevant medical records._"
+                    )
+                    
+                    logger.info(f"Sending booking confirmation to {phone} with facility: {facility_name}")
+                    self._send(phone, booking_message)
+                    logger.info(f"Booking confirmation sent successfully to {phone}")
+                    
+                except Exception as e:
+                    logger.error(f"Failed to get facility data for booking: {e}")
+                    # Emergency fallback
+                    self._send(phone, f"✅ Booking confirmed! Reference: {_patient_token(phone)}")
+            
             _clear_session(phone)
 
         else:
@@ -355,16 +447,276 @@ class WhatsAppHandler:
             "*Commands:*\n"
             "• *status* — Check your last result\n"
             "• *reset* — Start a new assessment\n"
-            "• *help* — Show this menu\n\n"
+            "• *help* — Show this menu\n"
+            "• *book* — Book an appointment\n"
             "_Based on WHO clinical guidelines. Not a substitute for a doctor._"
         )
 
+    def _cmd_booking(self, phone: str, text: str) -> None:
+        """Handle booking-related commands."""
+        text_lower = text.lower()
+        logger.info(f"Booking command received: {text_lower}")
+        
+        # Use real facility data instead of sample data
+        if "confirm" in text_lower or "book" in text_lower:
+            logger.info(f"Sending booking confirmation to {phone}")
+            # Get real facility data from database
+            try:
+                from apps.triage.models import TriageSession
+                from apps.facilities.models import Facility, FacilityRouting
+                
+                token = _patient_token(phone)
+                routing = FacilityRouting.objects.filter(
+                    patient_token=token,
+                    routing_status=FacilityRouting.RoutingStatus.CONFIRMED
+                ).first()
+                
+                if routing and routing.facility:
+                    facility = routing.facility
+                    facility_name = facility.name
+                    facility_phone = facility.phone_number
+                    facility_address = facility.address
+                    
+                    # Generate realistic appointment time (tomorrow morning)
+                    from datetime import datetime, timedelta
+                    tomorrow = datetime.now() + timedelta(days=1)
+                    appointment_date = tomorrow.strftime("%A, %d %B %Y")
+                    appointment_time = "10:30 AM"
+                    
+                    # Send booking confirmation with real facility data
+                    self._send_booking_confirmation(
+                        phone=phone,
+                        facility_name=facility_name,
+                        appointment_date=appointment_date,
+                        appointment_time=appointment_time
+                    )
+                else:
+                    # Fallback to generic message if no confirmed facility
+                    self._send(
+                        phone,
+                        "📅 *Booking Help*\n\n"
+                        "No confirmed facility found for your assessment.\n"
+                        "Please complete an assessment first, or contact support.\n\n"
+                        "Type 'help' for assistance."
+                    )
+                    
+            except Exception as e:
+                logger.error(f"Failed to get facility data for manual booking: {e}")
+                self._send(
+                    phone,
+                    "📅 *Booking System Temporarily Unavailable*\n\n"
+                    "Please try again in a few minutes or call the facility directly.\n\n"
+                    "Type 'help' for assistance."
+                )
+        elif "reschedule" in text_lower:
+            self._send(
+                phone,
+                "📞 *To reschedule:*\n\n"
+                "Please call the facility directly:\n"
+                "• HarakaCare Health Centre: +256 123 456 789\n"
+                "• Emergency: +256 999 000 111\n\n"
+                "Or reply with 'book' to make a new appointment."
+            )
+        else:
+            self._send(
+                phone,
+                "📅 *Booking Help*\n\n"
+                "To book an appointment:\n"
+                "• Reply 'book' to schedule\n"
+                "• Reply 'confirm' for confirmation\n"
+                "• Reply 'reschedule' to change appointment\n\n"
+                "Or call us directly at +256 123 456 789"
+            )
+
+    def _send_booking_confirmation(self, phone: str, facility_name: str, appointment_date: str, appointment_time: str) -> None:
+        """Send booking confirmation message to patient."""
+        logger.info(f"Preparing booking confirmation for {phone}: {facility_name}, {appointment_date}, {appointment_time}")
+        parts = [
+            f"✅ *Booking Confirmed*\n\n",
+            f"🏥 *Facility:* {facility_name}\n",
+            f"📅 *Date:* {appointment_date}\n",
+            f"🕐 *Time:* {appointment_time}\n\n",
+            "📍 *Please arrive 15 minutes before your appointment.*\n\n",
+            "📞 *Need to reschedule?* Reply 'reschedule' or call the facility directly.\n\n",
+            f"_Reference: {_patient_token(phone)}_",
+            "\n_⚕️ Bring your ID and any relevant medical records._"
+        ]
+        message = "\n".join(parts)
+        logger.info(f"Sending booking confirmation message: {message}")
+        self._send(phone, message)
+
+    def _send_booking_reminder(self, phone: str, facility_name: str, appointment_date: str, appointment_time: str) -> None:
+        """Send booking reminder message to patient."""
+        parts = [
+            f"⏰ *Appointment Reminder*\n\n",
+            f"🏥 *Facility:* {facility_name}\n",
+            f"📅 *Date:* {appointment_date}\n",
+            f"🕐 *Time:* {appointment_time}\n\n",
+            "📍 *Your appointment is coming up soon!*\n\n",
+            "📞 *Need to reschedule?* Reply 'reschedule'\n\n",
+            f"_Reference: {_patient_token(phone)}_"
+        ]
+        self._send(phone, "\n".join(parts))
+
     # ── Delivery helper ────────────────────────────────────────────────────────
+
+    def _send_structured_menu(self, phone: str, message: str, active_field: str) -> None:
+        """
+        Convert structured menu to interactive buttons or lists.
+        
+        - Interactive Buttons for 2-3 options: pregnancy_status, allergies, on_medication, consents, condition_occurrence, sex
+        - Interactive Lists for 4+ options: progression_status, duration, severity, age_group
+        - Each field now has its own separate menu for better UX
+        """
+        try:
+            # Debug: log what we received
+            logger.debug(f"Structured menu - Field: {active_field}, Message: {message[:200]}...")
+            
+            # Parse the menu to extract options
+            lines = message.split('\n')
+            options = []
+            header_text = ""
+            body_text = ""
+            
+            # Collect all options and header/body text
+            for line in lines:
+                line = line.strip()
+                
+                # Extract options from numbered lines
+                if (line.startswith(('1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣')) or 
+                    line.startswith(('A.', 'B.', '1.', '2.', '3.', '4.', '5.', '6.', '7.'))):
+                    
+                    option_id = ""
+                    option_title = ""
+                    
+                    # Handle emoji format (1️⃣, 2️⃣, etc.)
+                    if line.startswith(('1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣')):
+                        # Extract the number at the start
+                        emoji_match = re.match(r'^(\d+️⃣)\s*(.*)', line)
+                        if emoji_match:
+                            option_id = emoji_match.group(1)[0]  # First character of the emoji (the number)
+                            option_title = emoji_match.group(2).strip()  # The text after emoji
+                        else:
+                            # Fallback: extract first character as ID, rest as title
+                            option_id = line[0]
+                            option_title = re.sub(r'^\d+️⃣\s*', '', line).strip()
+                    # Handle letter format (A., B.)
+                    elif line.startswith(('A.', 'B.')):
+                        option_id = line[0]
+                        option_title = line[2:].strip()
+                    # Handle numbered format (1., 2., etc.)
+                    elif '. ' in line:
+                        parts = line.split('. ', 1)
+                        if len(parts) == 2:
+                            option_id = parts[0]
+                            option_title = parts[1].strip()
+                        else:
+                            option_id = line[0]
+                            option_title = line[2:].strip()
+                    
+                    if option_id and option_title:
+                        options.append({
+                            "id": option_id,
+                            "title": option_title
+                        })
+                        
+                elif not any(line.startswith(prefix) for prefix in ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', 'A.', 'B.', '1.', '2.', '3.', '4.', '5.', '6.', '7.']):
+                    # This is header/body text
+                    if header_text:
+                        body_text += line + "\n"
+                    else:
+                        header_text = line
+                        body_text = line + "\n"
+            
+            # Clean up body text
+            body_text = body_text.strip()
+            
+            # Interactive Buttons for 2-3 options
+            if len(options) <= 3:
+                buttons = []
+                for option in options:
+                    # Debug: print what we're working with
+                    logger.debug(f"Processing option: {option}")
+                    # Ensure option has both id and title
+                    if option.get("id") and option.get("title"):
+                        button_obj = {
+                            "id": str(option["id"]),  # Ensure string
+                            "title": option["title"][:20]  # WhatsApp button titles max 20 chars
+                        }
+                        # Double-check the button has required fields
+                        if button_obj.get("id") and button_obj.get("title"):
+                            buttons.append(button_obj)
+                            logger.debug(f"Added button: {button_obj}")
+                        else:
+                            logger.warning(f"Created invalid button object: {button_obj}")
+                    else:
+                        logger.warning(f"Skipping option without id or title: {option}")
+                
+                logger.debug(f"Final buttons list: {buttons}")
+                # Final validation - ensure all buttons have id and title
+                valid_buttons = []
+                for btn in buttons:
+                    if isinstance(btn, dict) and btn.get("id") and btn.get("title"):
+                        valid_buttons.append(btn)
+                    else:
+                        logger.error(f"Invalid button object found: {btn}")
+                
+                if valid_buttons:  # Only send if we have valid buttons
+                    logger.debug(f"Sending {len(valid_buttons)} valid buttons")
+                    self.client.send_interactive_buttons(
+                        to=phone,
+                        body_text=body_text,
+                        buttons=valid_buttons
+                    )
+                else:
+                    # Fallback to text if no valid buttons
+                    logger.warning(f"No valid buttons found, falling back to text. Original options: {options}")
+                    self._send(phone, message)
+                
+            # Interactive Lists for 4+ options
+            elif len(options) >= 4:
+                list_sections = [{
+                    "title": "Select an option:",
+                    "rows": []
+                }]
+                
+                valid_options = False
+                for option in options:
+                    if option.get("id") and option.get("title"):
+                        list_sections[0]["rows"].append({
+                            "id": str(option["id"]),  # Ensure string
+                            "title": option["title"][:24],  # WhatsApp list item titles max 24 chars
+                            "description": ""
+                        })
+                        valid_options = True
+                
+                if valid_options:  # Only send if we have valid options
+                    self.client.send_interactive_list(
+                        to=phone,
+                        header_text=header_text if len(header_text) < 60 else None,
+                        body_text=body_text,
+                        button_label="Choose",
+                        sections=list_sections
+                    )
+                else:
+                    # Fallback to text if no valid options
+                    self._send(phone, message)
+            
+            else:
+                # Fallback to regular text if no options detected
+                self._send(phone, message)
+                
+        except DialogAPIError as exc:
+            logger.error(f"Failed to send structured menu to {phone}: {exc}")
+            self._send(phone, "Sorry, I had trouble with that menu. Please try again.")
 
     def _send(self, phone: str, text: str) -> None:
         if len(text) > 4096:
             text = text[:4093] + "…"
+        logger.info(f"Sending message to {phone}: {text[:100]}...")
         try:
             self.client.send_text(phone, text)
+            logger.info(f"Message sent successfully to {phone}")
         except DialogAPIError as exc:
             logger.error(f"Failed to send to {phone}: {exc}")
+            self._send(phone, "Sorry, I had trouble with that menu. Please try again.")

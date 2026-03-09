@@ -1,6 +1,7 @@
 """
 apps/messaging/whatsapp/urls.py
-URL routing for the 360dialog WhatsApp webhook.
+URL routing for Meta WhatsApp Cloud API webhook.
+Updated from 360dialog to Meta WhatsApp Cloud API.
 """
 
 from django.urls import path
@@ -9,12 +10,22 @@ from apps.messaging.whatsapp.whatsapp_views import WhatsAppWebhookView
 app_name = "whatsapp"
 
 urlpatterns = [
+    # Meta WhatsApp Cloud API webhook (main endpoint)
     path("webhook/", WhatsAppWebhookView.as_view(), name="webhook"),
+    
+    # Meta WhatsApp Cloud API webhook (without trailing slash for Meta compatibility)
+    path("webhook", WhatsAppWebhookView.as_view(), name="webhook_noslash"),
+    
+    # Meta WhatsApp Cloud API webhook (alternative endpoint for Meta's URL format)
+    path("meta/webhook/", WhatsAppWebhookView.as_view(), name="meta_webhook"),
+    
+    # Meta WhatsApp Cloud API webhook (without trailing slash)
+    path("meta/webhook", WhatsAppWebhookView.as_view(), name="meta_webhook_noslash"),
 ]
 
 
 # ============================================================================
-# SETUP GUIDE
+# META WHATSAPP CLOUD API SETUP GUIDE
 # ============================================================================
 #
 # 1. Add to your root urls.py:
@@ -24,37 +35,39 @@ urlpatterns = [
 #
 # 2. Add to your Django settings (development.py / production.py):
 #    ----------------------------------------------------------------
-#    # 360dialog credentials — get these from your 360dialog dashboard
-#    THREESIXTY_DIALOG_API_KEY       = env("THREESIXTY_DIALOG_API_KEY")
-#    THREESIXTY_DIALOG_BASE_URL      = "https://waba.360dialog.io"       # production
-#    # THREESIXTY_DIALOG_BASE_URL    = "https://waba-sandbox.360dialog.io"  # sandbox
-#    THREESIXTY_DIALOG_WEBHOOK_SECRET = env("THREESIXTY_DIALOG_WEBHOOK_SECRET")
-#    THREESIXTY_DIALOG_VERIFY_TOKEN  = env("THREESIXTY_DIALOG_VERIFY_TOKEN", default="harakacare_verify")
+#    # Meta WhatsApp Cloud API credentials - get from Meta Developers Dashboard
+#    META_WHATSAPP_ACCESS_TOKEN      = env("META_WHATSAPP_ACCESS_TOKEN")
+#    META_WHATSAPP_PHONE_NUMBER_ID   = env("META_WHATSAPP_PHONE_NUMBER_ID")
+#    META_WHATSAPP_WEBHOOK_VERIFY_TOKEN = env("META_WHATSAPP_WEBHOOK_VERIFY_TOKEN", default="harakacare_meta_verify")
+#    META_WHATSAPP_APP_SECRET         = env("META_WHATSAPP_APP_SECRET")
+#    META_WHATSAPP_BASE_URL          = "https://graph.facebook.com"  # production
 #
 #
-# 3. Register the webhook in the 360dialog dashboard:
+# 3. Configure webhook in Meta Developers Dashboard:
 #    ----------------------------------------------------------------
 #    URL:    https://yourdomain.com/messaging/whatsapp/webhook/
 #    Method: POST
-#    Events: messages
-#    Verify token: (match THREESIXTY_DIALOG_VERIFY_TOKEN above)
+#    Verify token: (match META_WHATSAPP_WEBHOOK_VERIFY_TOKEN above)
+#    Fields: messages, message_status
+#    App secret: (match META_WHATSAPP_APP_SECRET above)
 #
 #
 # 4. Required environment variables (.env):
 #    ----------------------------------------------------------------
-#    THREESIXTY_DIALOG_API_KEY=your_api_key_from_360dialog_dashboard
-#    THREESIXTY_DIALOG_WEBHOOK_SECRET=your_shared_secret_from_dashboard
-#    THREESIXTY_DIALOG_VERIFY_TOKEN=harakacare_verify
+#    META_WHATSAPP_ACCESS_TOKEN=your_access_token_from_meta_dashboard
+#    META_WHATSAPP_PHONE_NUMBER_ID=your_phone_number_id_from_meta
+#    META_WHATSAPP_WEBHOOK_VERIFY_TOKEN=harakacare_meta_verify
+#    META_WHATSAPP_APP_SECRET=your_app_secret_from_meta
 #
 #
 # ============================================================================
-# MESSAGE FLOW DIAGRAM
+# MESSAGE FLOW DIAGRAM (Meta WhatsApp Cloud)
 # ============================================================================
 #
 #  User sends WhatsApp message
 #         │
 #         ▼
-#  360dialog platform
+#  Meta WhatsApp Cloud API
 #         │  POST /messaging/whatsapp/webhook/
 #         ▼
 #  WhatsAppWebhookView.post()
@@ -73,7 +86,7 @@ urlpatterns = [
 #                  Result from agent
 #                         │
 #                         ├─ red_flags_detected ──► _send_emergency()  → clear session
-#                         ├─ status=incomplete  ──► _send() follow-up question
+#                         ├─ status=incomplete  ──► _format_menu_response() → interactive buttons
 #                         └─ status=complete    ──► _send_complete()    → clear session
 #                                                         │
 #                                                         ▼
@@ -82,54 +95,26 @@ urlpatterns = [
 #
 #
 # ============================================================================
-# CONVERSATION EXAMPLE
+# INTERACTIVE MESSAGE EXAMPLES
 # ============================================================================
 #
-#  User:  "I have a severe headache and I've been vomiting"
-#  Bot:   "I want to help assess your symptoms. How old is the patient?
-#          Are you describing your own symptoms or someone else's?"
+# Age/Sex Gate as Interactive Buttons:
+# "First, I need to know who we're helping. Please select:"
+# → Shows buttons: "1️⃣ Newborn Male", "1️⃣ Newborn Female", etc.
 #
-#  User:  "It's me, I'm 32 years old"
-#  Bot:   "Have you had any vision changes, neck stiffness, or sensitivity to light?
-#          (3/7 fields collected)"
+# Pregnancy Status as Interactive Buttons:
+# "🤰 Is patient currently pregnant?"
+# → Shows buttons: "1️⃣ Yes", "2️⃣ No", "3️⃣ Not sure"
 #
-#  User:  "Yes my neck is stiff and I can't look at bright light"
-#  Bot:   "⚠️ This sounds urgent. How long have these symptoms lasted?"
-#
-#  User:  "About 6 hours. I'm in Kampala"
-#  Bot:   "Do you consent to HarakaCare processing your symptoms for assessment?"
-#
-#  User:  "Yes I agree"
-#  Bot:   "✅ HarakaCare Assessment Complete
-#
-#          🔴 Risk Level: HIGH
-#          Priority: URGENT
-#          Recommended facility: hospital
-#
-#          Seek care at Mulago National Referral Hospital or nearest emergency dept.
-#          These symptoms may indicate meningitis or another serious condition.
-#
-#          Your reference token: PT-ABC123DEFGH456
-#          This is not a medical diagnosis..."
+# Location Request:
+# "Please share your location for better facility matching."
+# → Shows location request button
 #
 # ============================================================================
-# CELERY ASYNC OPTION (for production scaling)
+# TESTING
 # ============================================================================
 #
-# If processing time is too long (>5s), move the handler call to a Celery task:
+# Test webhook verification:
+# curl -X GET "https://yourdomain.com/messaging/whatsapp/webhook/?hub.verify_token=harakacare_meta_verify"
 #
-#   # tasks.py
-#   from celery import shared_task
-#   from apps.messaging.whatsapp.handler import WhatsAppHandler
-#
-#   @shared_task(bind=True, max_retries=3, default_retry_delay=5)
-#   def process_whatsapp_message(self, phone, text, message_id):
-#       handler = WhatsAppHandler()
-#       try:
-#           handler.handle(phone=phone, message_text=text, message_id=message_id)
-#       except Exception as exc:
-#           raise self.retry(exc=exc)
-#
-#   # In views.py _process_message(), replace the direct call with:
-#   process_whatsapp_message.delay(phone, text, message_id)
-#
+# Should return the hub.challenge value if successful.

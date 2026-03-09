@@ -16,9 +16,13 @@ class USSDMenu(Enum):
     COMPLAINT_SELECTION = "complaint_selection"
     AGE_SELECTION = "age_selection"
     SEX_SELECTION = "sex_selection"
+    DISTRICT_INPUT = "district_input"
+    VILLAGE_INPUT = "village_input"
+    ALLERGIES_INPUT = "allergies_input"
+    CHRONIC_CONDITIONS_INPUT = "chronic_conditions_input"
+    MEDICATION_INPUT = "medication_input"
     SEVERITY_SELECTION = "severity_selection"
     DURATION_SELECTION = "duration_selection"
-    LOCATION_INPUT = "location_input"
     PREGNANCY_CHECK = "pregnancy_check"
     CONSENT = "consent"
     PROCESSING = "processing"
@@ -40,13 +44,9 @@ MENU_TEXTS = {
         "en": (
             "Welcome to HarakaCare\n"
             "Fast health assessment.\n"
-            "1. English\n"
-            "2. Luganda"
-        ),
-        "luganda": (
-            "Tukawereza ku HarakaCare\n"
-            "1. English\n"
-            "2. Luganda"
+            "1. Start assessment\n"
+            "2. Check previous result\n"
+            "3. Help"
         ),
     },
 
@@ -56,12 +56,6 @@ MENU_TEXTS = {
             "1. Start health assessment\n"
             "2. Check previous result\n"
             "3. Help"
-        ),
-        "luganda": (
-            "HarakaCare:\n"
-            "1. Tandika okukebera obulamu\n"
-            "2. Kebera ekyavunaanibwa edda\n"
-            "3. Obuyambi"
         ),
     },
 
@@ -77,22 +71,11 @@ MENU_TEXTS = {
             "7. Bleeding\n"
             "8. Other"
         ),
-        "luganda": (
-            "Obuzibu bwa ddala ki?\n"
-            "1. Omusujja\n"
-            "2. Okussa / Enkuba\n"
-            "3. Omukono / Omusawo\n"
-            "4. Oluuyi / Okuyita\n"
-            "5. Omutwe / Okwennyamira\n"
-            "6. Ekifuba\n"
-            "7. Omusaayi\n"
-            "8. Ekirala"
-        ),
     },
 
     USSDMenu.AGE_SELECTION: {
         "en": (
-            "Age of the patient:\n"
+            "Age of patient:\n"
             "1. Newborn (0-2 months)\n"
             "2. Infant (2-12 months)\n"
             "3. Child (1-5 years)\n"
@@ -101,21 +84,30 @@ MENU_TEXTS = {
             "6. Adult (18-64 years)\n"
             "7. Elderly (65+ years)"
         ),
-        "luganda": (
-            "Emyaka gye ya musaasizi:\n"
-            "1. Omwana omupya (0-2 emyezi)\n"
-            "2. Akana (2-12 emyezi)\n"
-            "3. Omwana (1-5 emyaka)\n"
-            "4. Omwana (6-12 emyaka)\n"
-            "5. Omuvubuka (13-17 emyaka)\n"
-            "6. Omuntu omukulu (18-64)\n"
-            "7. Omuzee (65+)"
-        ),
     },
 
     USSDMenu.SEX_SELECTION: {
         "en": "Sex of patient:\n1. Male\n2. Female",
-        "luganda": "Emiti ya musaasizi:\n1. Omusajja\n2. Omukazi",
+    },
+
+    USSDMenu.DISTRICT_INPUT: {
+        "en": "Enter your district name (e.g. Kampala, Wakiso, Jinja):",
+    },
+
+    USSDMenu.VILLAGE_INPUT: {
+        "en": "Enter your village/town name (e.g. Kibuye, Nateete):",
+    },
+
+    USSDMenu.ALLERGIES_INPUT: {
+        "en": "Does the patient have any known allergies?\n1. Yes\n2. No\n3. Not sure",
+    },
+
+    USSDMenu.CHRONIC_CONDITIONS_INPUT: {
+        "en": "Does the patient have any long-term conditions? (e.g. diabetes, hypertension)\n1. Yes - please describe\n2. No",
+    },
+
+    USSDMenu.MEDICATION_INPUT: {
+        "en": "Is the patient currently taking any medication?\n1. Yes\n2. No",
     },
 
     USSDMenu.SEVERITY_SELECTION: {
@@ -125,13 +117,6 @@ MENU_TEXTS = {
             "2. Moderate - some difficulty\n"
             "3. Severe - cannot do activities\n"
             "4. Very severe - cannot move/speak"
-        ),
-        "luganda": (
-            "Obuzibu bumala butya?\n"
-            "1. Butono\n"
-            "2. Bupakivu\n"
-            "3. Bunene nnyo\n"
-            "4. Buzibu ennyo - tayinza kukola nayo"
         ),
     },
 
@@ -146,26 +131,10 @@ MENU_TEXTS = {
             "6. More than 1 week\n"
             "7. More than 1 month"
         ),
-        "luganda": (
-            "Obuzibu bwakuwerera ennaku emeka?\n"
-            "1. Saawa nga ntono ku emu\n"
-            "2. 1-6 ssaawa\n"
-            "3. 6-24 ssaawa\n"
-            "4. Ennaku 1-3\n"
-            "5. Ennaku 4-7\n"
-            "6. Wiiki eyitirewo\n"
-            "7. Omwezi ogiyitirewo"
-        ),
-    },
-
-    USSDMenu.LOCATION_INPUT: {
-        "en": "Enter your district name (e.g. Kampala, Wakiso, Jinja):",
-        "luganda": "Wandiika erinnya ly'esaza lyo (e.g. Kampala, Wakiso):",
     },
 
     USSDMenu.PREGNANCY_CHECK: {
         "en": "Is the patient pregnant?\n1. Yes\n2. Possibly\n3. No",
-        "luganda": "Musaasizi alina enda?\n1. Yee\n2. Okubeera\n3. Nedda",
     },
 
     USSDMenu.CONSENT: {
@@ -175,16 +144,10 @@ MENU_TEXTS = {
             "1. I agree - continue\n"
             "2. Cancel"
         ),
-        "luganda": (
-            "HarakaCare ekyeka okukebera obuzibu bwo.\n"
-            "1. Nkkiriziganya - Endelee\n"
-            "2. Sazaamu"
-        ),
     },
 
     USSDMenu.PROCESSING: {
         "en": "Assessing your symptoms. Please wait...",
-        "luganda": "Tukekebera obuzibu bwo. Linda...",
     },
 
     USSDMenu.EMERGENCY: {
@@ -193,11 +156,6 @@ MENU_TEXTS = {
             "Go to the nearest hospital NOW.\n"
             "Call emergency: 999 / 0800 100 066\n"
             "Do not wait."
-        ),
-        "luganda": (
-            "⚠️ OBUKODYO OBUNENE\n"
-            "Genda ku ddwaliro erisinga okumpi KKAKAANO.\n"
-            "Kuba: 999 / 0800 100 066"
         ),
     },
 }
@@ -253,6 +211,22 @@ PREGNANCY_MAPPING = {
     "1": "yes",
     "2": "possible",
     "3": "no",
+}
+
+ALLERGIES_MAPPING = {
+    "1": "yes",
+    "2": "no",
+    "3": "not_sure",
+}
+
+CHRONIC_CONDITIONS_MAPPING = {
+    "1": "yes",
+    "2": "no",
+}
+
+MEDICATION_MAPPING = {
+    "1": "yes",
+    "2": "no",
 }
 
 # ---------------------------------------------------------------------------

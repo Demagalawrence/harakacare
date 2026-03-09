@@ -11,6 +11,7 @@ from typing import Dict, Any
 from apps.messaging.ussd.menus import (
     MENU_TEXTS, COMPLAINT_MAPPING, AGE_MAPPING, SEX_MAPPING,
     SEVERITY_MAPPING, DURATION_MAPPING, PREGNANCY_MAPPING,
+    ALLERGIES_MAPPING, CHRONIC_CONDITIONS_MAPPING, MEDICATION_MAPPING,
     EMERGENCY_COMPLAINTS, EMERGENCY_SEVERITIES, USSDMenu
 )
 from apps.messaging.ussd.session import SessionManager
@@ -54,10 +55,6 @@ class USSDHandler:
 
         if menu == USSDMenu.WELCOME.value:
             return self._handle_welcome(session, current_input)
-        elif menu == USSDMenu.LANGUAGE.value:
-            return self._handle_language(session, current_input)
-        elif menu == USSDMenu.MAIN_MENU.value:
-            return self._handle_main_menu(session, current_input)
 
         # ------ Status-check branch ------
         elif menu == USSDMenu.STATUS_TOKEN_INPUT.value:
@@ -70,12 +67,20 @@ class USSDHandler:
             return self._handle_age(session, current_input)
         elif menu == USSDMenu.SEX_SELECTION.value:
             return self._handle_sex(session, current_input)
+        elif menu == USSDMenu.ALLERGIES_INPUT.value:
+            return self._handle_allergies(session, current_input)
+        elif menu == USSDMenu.CHRONIC_CONDITIONS_INPUT.value:
+            return self._handle_chronic_conditions(session, current_input)
+        elif menu == USSDMenu.MEDICATION_INPUT.value:
+            return self._handle_medication(session, current_input)
         elif menu == USSDMenu.SEVERITY_SELECTION.value:
             return self._handle_severity(session, current_input)
         elif menu == USSDMenu.DURATION_SELECTION.value:
             return self._handle_duration(session, current_input)
-        elif menu == USSDMenu.LOCATION_INPUT.value:
-            return self._handle_location(session, current_input)
+        elif menu == USSDMenu.DISTRICT_INPUT.value:
+            return self._handle_district(session, current_input)
+        elif menu == USSDMenu.VILLAGE_INPUT.value:
+            return self._handle_village(session, current_input)
         elif menu == USSDMenu.PREGNANCY_CHECK.value:
             return self._handle_pregnancy(session, current_input)
         elif menu == USSDMenu.CONSENT.value:
@@ -86,7 +91,7 @@ class USSDHandler:
         # ------ Terminal screens ------
         elif menu == USSDMenu.EMERGENCY.value:
             return self._ussd_response(
-                MENU_TEXTS[USSDMenu.EMERGENCY][session.language], end=True
+                MENU_TEXTS[USSDMenu.EMERGENCY]["en"], end=True
             )
         elif menu == USSDMenu.COMPLETE.value:
             return self._ussd_response("Thank you for using HarakaCare. Stay healthy!", end=True)
@@ -112,28 +117,16 @@ class USSDHandler:
     # ------------------------------------------------------------------
 
     def _handle_welcome(self, session, text: str) -> Dict[str, Any]:
-        """First request always has empty text. Show language menu."""
-        session.current_menu = USSDMenu.LANGUAGE.value
+        """First request always has empty text. Start assessment directly."""
+        session.current_menu = USSDMenu.COMPLAINT_SELECTION.value
         SessionManager.save_session(session)
-        return self._ussd_response(MENU_TEXTS[USSDMenu.WELCOME][session.language])
-
-    def _handle_language(self, session, text: str) -> Dict[str, Any]:
-        if text == "1":
-            session.language = "en"
-        elif text == "2":
-            session.language = "luganda"
-        else:
-            return self._ussd_response("Please select 1 (English) or 2 (Luganda).")
-
-        session.current_menu = USSDMenu.MAIN_MENU.value
-        SessionManager.save_session(session)
-        return self._ussd_response(MENU_TEXTS[USSDMenu.MAIN_MENU][session.language])
+        return self._ussd_response(MENU_TEXTS[USSDMenu.WELCOME]["en"])
 
     def _handle_main_menu(self, session, text: str) -> Dict[str, Any]:
         if text == "1":  # Start new triage
             session.current_menu = USSDMenu.COMPLAINT_SELECTION.value
             SessionManager.save_session(session)
-            return self._ussd_response(MENU_TEXTS[USSDMenu.COMPLAINT_SELECTION][session.language])
+            return self._ussd_response(MENU_TEXTS[USSDMenu.COMPLAINT_SELECTION]["en"])
         elif text == "2":  # Check previous result
             session.current_menu = USSDMenu.STATUS_TOKEN_INPUT.value
             SessionManager.save_session(session)
@@ -149,7 +142,7 @@ class USSDHandler:
                 end=False
             )
         else:
-            return self._ussd_response(MENU_TEXTS[USSDMenu.MAIN_MENU][session.language])
+            return self._ussd_response(MENU_TEXTS[USSDMenu.MAIN_MENU]["en"])
 
     # ------------------------------------------------------------------
     # Status-check flow
@@ -232,9 +225,7 @@ class USSDHandler:
 
     def _handle_complaint(self, session, text: str) -> Dict[str, Any]:
         if text not in COMPLAINT_MAPPING:
-            return self._ussd_response(
-                MENU_TEXTS[USSDMenu.COMPLAINT_SELECTION][session.language]
-            )
+            return self._ussd_response(MENU_TEXTS[USSDMenu.COMPLAINT_SELECTION]["en"])
 
         complaint = COMPLAINT_MAPPING[text]
         session.data["complaint_group"] = complaint
@@ -244,34 +235,71 @@ class USSDHandler:
             session.current_menu = USSDMenu.EMERGENCY.value
             SessionManager.save_session(session)
             return self._ussd_response(
-                MENU_TEXTS[USSDMenu.EMERGENCY][session.language], end=True
+                MENU_TEXTS[USSDMenu.EMERGENCY]["en"], end=True
             )
 
         session.current_menu = USSDMenu.AGE_SELECTION.value
         SessionManager.save_session(session)
-        return self._ussd_response(MENU_TEXTS[USSDMenu.AGE_SELECTION][session.language])
+        return self._ussd_response(MENU_TEXTS[USSDMenu.AGE_SELECTION]["en"])
 
     def _handle_age(self, session, text: str) -> Dict[str, Any]:
         if text not in AGE_MAPPING:
-            return self._ussd_response(MENU_TEXTS[USSDMenu.AGE_SELECTION][session.language])
+            return self._ussd_response(MENU_TEXTS[USSDMenu.AGE_SELECTION]["en"])
 
         session.data["age_group"] = AGE_MAPPING[text]
         session.current_menu = USSDMenu.SEX_SELECTION.value
         SessionManager.save_session(session)
-        return self._ussd_response(MENU_TEXTS[USSDMenu.SEX_SELECTION][session.language])
+        return self._ussd_response(MENU_TEXTS[USSDMenu.SEX_SELECTION]["en"])
 
     def _handle_sex(self, session, text: str) -> Dict[str, Any]:
         if text not in SEX_MAPPING:
-            return self._ussd_response(MENU_TEXTS[USSDMenu.SEX_SELECTION][session.language])
+            return self._ussd_response(MENU_TEXTS[USSDMenu.SEX_SELECTION]["en"])
 
         session.data["sex"] = SEX_MAPPING[text]
+        session.current_menu = USSDMenu.ALLERGIES_INPUT.value
+        SessionManager.save_session(session)
+        return self._ussd_response(MENU_TEXTS[USSDMenu.ALLERGIES_INPUT]["en"])
+
+    def _handle_allergies(self, session, text: str) -> Dict[str, Any]:
+        if text not in ALLERGIES_MAPPING:
+            return self._ussd_response(MENU_TEXTS[USSDMenu.ALLERGIES_INPUT]["en"])
+
+        session.data["allergies"] = ALLERGIES_MAPPING[text]
+        session.current_menu = USSDMenu.CHRONIC_CONDITIONS_INPUT.value
+        SessionManager.save_session(session)
+        return self._ussd_response(MENU_TEXTS[USSDMenu.CHRONIC_CONDITIONS_INPUT]["en"])
+
+    def _handle_chronic_conditions(self, session, text: str) -> Dict[str, Any]:
+        if text not in CHRONIC_CONDITIONS_MAPPING:
+            return self._ussd_response(MENU_TEXTS[USSDMenu.CHRONIC_CONDITIONS_INPUT]["en"])
+
+        if text == "1":
+            # User said yes - need to collect chronic conditions details
+            session.current_menu = USSDMenu.CHRONIC_CONDITIONS_INPUT.value
+            SessionManager.save_session(session)
+            return self._ussd_response(
+                "Please list any long-term conditions (e.g. diabetes, hypertension, asthma):\n"
+                "Reply with the conditions or 0 to skip."
+            )
+        else:
+            # User said no
+            session.data["chronic_conditions"] = CHRONIC_CONDITIONS_MAPPING[text]
+            session.current_menu = USSDMenu.MEDICATION_INPUT.value
+            SessionManager.save_session(session)
+            return self._ussd_response(MENU_TEXTS[USSDMenu.MEDICATION_INPUT]["en"])
+
+    def _handle_medication(self, session, text: str) -> Dict[str, Any]:
+        if text not in MEDICATION_MAPPING:
+            return self._ussd_response(MENU_TEXTS[USSDMenu.MEDICATION_INPUT]["en"])
+
+        session.data["on_medication"] = MEDICATION_MAPPING[text]
         session.current_menu = USSDMenu.SEVERITY_SELECTION.value
         SessionManager.save_session(session)
-        return self._ussd_response(MENU_TEXTS[USSDMenu.SEVERITY_SELECTION][session.language])
+        return self._ussd_response(MENU_TEXTS[USSDMenu.SEVERITY_SELECTION]["en"])
 
     def _handle_severity(self, session, text: str) -> Dict[str, Any]:
         if text not in SEVERITY_MAPPING:
-            return self._ussd_response(MENU_TEXTS[USSDMenu.SEVERITY_SELECTION][session.language])
+            return self._ussd_response(MENU_TEXTS[USSDMenu.SEVERITY_SELECTION]["en"])
 
         severity = SEVERITY_MAPPING[text]
         session.data["symptom_severity"] = severity
@@ -281,44 +309,43 @@ class USSDHandler:
             session.current_menu = USSDMenu.EMERGENCY.value
             SessionManager.save_session(session)
             return self._ussd_response(
-                MENU_TEXTS[USSDMenu.EMERGENCY][session.language], end=True
+                MENU_TEXTS[USSDMenu.EMERGENCY]["en"], end=True
             )
 
         session.current_menu = USSDMenu.DURATION_SELECTION.value
         SessionManager.save_session(session)
-        return self._ussd_response(MENU_TEXTS[USSDMenu.DURATION_SELECTION][session.language])
+        return self._ussd_response(MENU_TEXTS[USSDMenu.DURATION_SELECTION]["en"])
 
     def _handle_duration(self, session, text: str) -> Dict[str, Any]:
         if text not in DURATION_MAPPING:
-            return self._ussd_response(MENU_TEXTS[USSDMenu.DURATION_SELECTION][session.language])
+            return self._ussd_response(MENU_TEXTS[USSDMenu.DURATION_SELECTION]["en"])
 
         session.data["symptom_duration"] = DURATION_MAPPING[text]
-        session.current_menu = USSDMenu.LOCATION_INPUT.value
+        session.current_menu = USSDMenu.DISTRICT_INPUT.value
         SessionManager.save_session(session)
-        return self._ussd_response(MENU_TEXTS[USSDMenu.LOCATION_INPUT][session.language])
+        return self._ussd_response(MENU_TEXTS[USSDMenu.DISTRICT_INPUT]["en"])
 
-    def _handle_location(self, session, text: str) -> Dict[str, Any]:
+    def _handle_district(self, session, text: str) -> Dict[str, Any]:
         if not text or len(text.strip()) < 2:
             return self._ussd_response("Please enter your district name (e.g. Kampala).")
 
         session.data["district"] = text.strip().title()
-
-        # Only ask about pregnancy for females of childbearing age
-        if (
-            session.data.get("sex") == "female"
-            and session.data.get("age_group") in ["teen", "adult"]
-        ):
-            session.current_menu = USSDMenu.PREGNANCY_CHECK.value
-            SessionManager.save_session(session)
-            return self._ussd_response(MENU_TEXTS[USSDMenu.PREGNANCY_CHECK][session.language])
-
-        session.current_menu = USSDMenu.CONSENT.value
+        session.current_menu = USSDMenu.VILLAGE_INPUT.value
         SessionManager.save_session(session)
-        return self._ussd_response(MENU_TEXTS[USSDMenu.CONSENT][session.language])
+        return self._ussd_response(MENU_TEXTS[USSDMenu.VILLAGE_INPUT]["en"])
+
+    def _handle_village(self, session, text: str) -> Dict[str, Any]:
+        if not text or len(text.strip()) < 2:
+            return self._ussd_response("Please enter your village/town name (e.g. Kibuye).")
+
+        session.data["village"] = text.strip().title()
+        session.current_menu = USSDMenu.PREGNANCY_CHECK.value
+        SessionManager.save_session(session)
+        return self._ussd_response(MENU_TEXTS[USSDMenu.PREGNANCY_CHECK]["en"])
 
     def _handle_pregnancy(self, session, text: str) -> Dict[str, Any]:
         if text not in PREGNANCY_MAPPING:
-            return self._ussd_response(MENU_TEXTS[USSDMenu.PREGNANCY_CHECK][session.language])
+            return self._ussd_response(MENU_TEXTS[USSDMenu.PREGNANCY_CHECK]["en"])
 
         session.data["pregnancy_status"] = PREGNANCY_MAPPING[text]
 
@@ -332,12 +359,12 @@ class USSDHandler:
             session.current_menu = USSDMenu.EMERGENCY.value
             SessionManager.save_session(session)
             return self._ussd_response(
-                MENU_TEXTS[USSDMenu.EMERGENCY][session.language], end=True
+                MENU_TEXTS[USSDMenu.EMERGENCY]["en"], end=True
             )
 
         session.current_menu = USSDMenu.CONSENT.value
         SessionManager.save_session(session)
-        return self._ussd_response(MENU_TEXTS[USSDMenu.CONSENT][session.language])
+        return self._ussd_response(MENU_TEXTS[USSDMenu.CONSENT]["en"])
 
     def _handle_consent(self, session, text: str) -> Dict[str, Any]:
         if text == "1":
@@ -373,6 +400,7 @@ class USSDHandler:
             "age_group": session.data["age_group"],
             "sex": session.data["sex"],
             "district": session.data["district"],
+            "village": session.data.get("village", ""),
             # Consent — user agreed to all three via the single USSD consent screen
             "consent_medical_triage": True,
             "consent_data_sharing": True,

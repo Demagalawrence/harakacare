@@ -39,6 +39,25 @@ class FacilityViewSet(viewsets.ModelViewSet):
     search_fields = ['name', 'address', 'facility_type']
     ordering_fields = ['name', 'facility_type', 'created_at']
     ordering = ['name']
+    
+    def get_queryset(self):
+        """Filter facilities based on user profile"""
+        try:
+            user_profile = self.request.user.profile
+            if user_profile.facility:
+                # User can only see their assigned facility
+                return Facility.objects.filter(id=user_profile.facility.id)
+            elif user_profile.can_view_all_facilities:
+                # User can see all facilities
+                return Facility.objects.all()
+            else:
+                # No facility assigned and no special permissions
+                return Facility.objects.none()
+        except AttributeError:
+            # No profile found - return all for superusers, none for others
+            if self.request.user.is_superuser:
+                return Facility.objects.all()
+            return Facility.objects.none()
 
 
 # Authentication views
@@ -57,16 +76,35 @@ def facility_login(request):
     if user is not None:
         login(request, user)
         
-        # Try to get facility - if user field doesn't exist, return a default facility
+        # Try to get facility from user profile
         try:
-            facility = Facility.objects.get(user=user)
-            facility_data = {
-                'id': facility.id,
-                'name': facility.name,
-                'facility_type': facility.facility_type,
-                'district': facility.district
-            }
-        except (Facility.DoesNotExist, FieldError):
+            user_profile = request.user.profile
+            if user_profile.facility:
+                facility = user_profile.facility
+                facility_data = {
+                    'id': facility.id,
+                    'name': facility.name,
+                    'facility_type': facility.facility_type,
+                    'district': facility.district
+                }
+            else:
+                # Fallback: get first facility or create default response
+                facility = Facility.objects.first()
+                if facility:
+                    facility_data = {
+                        'id': facility.id,
+                        'name': facility.name,
+                        'facility_type': facility.facility_type,
+                        'district': facility.district
+                    }
+                else:
+                    facility_data = {
+                        'id': 1,
+                        'name': 'Default Facility',
+                        'facility_type': 'clinic',
+                        'district': 'Kampala'
+                    }
+        except (AttributeError,):
             # Fallback: get first facility or create default response
             facility = Facility.objects.first()
             if facility:
@@ -106,10 +144,14 @@ def facility_logout(request):
 def facility_whoami(request):
     """Get current facility info"""
     try:
-        # Try to get facility by user, fallback to first facility
+        # Try to get facility from user profile, fallback to first facility
         try:
-            facility = Facility.objects.get(user=request.user)
-        except (Facility.DoesNotExist, FieldError):
+            user_profile = request.user.profile
+            if user_profile.facility:
+                facility = user_profile.facility
+            else:
+                facility = Facility.objects.first()
+        except AttributeError:
             facility = Facility.objects.first()
             
         if facility:
@@ -134,10 +176,14 @@ def facility_whoami(request):
 def get_cases(request):
     """Get all cases for the facility"""
     try:
-        # Try to get facility by user, fallback to first facility
+        # Try to get facility from user profile, fallback to first facility
         try:
-            facility = Facility.objects.get(user=request.user)
-        except (Facility.DoesNotExist, FieldError):
+            user_profile = request.user.profile
+            if user_profile.facility:
+                facility = user_profile.facility
+            else:
+                facility = Facility.objects.first()
+        except AttributeError:
             facility = Facility.objects.first()
             
         if not facility:
@@ -181,10 +227,14 @@ def get_cases(request):
 def get_stats(request):
     """Get statistics for the facility dashboard"""
     try:
-        # Try to get facility by user, fallback to first facility
+        # Try to get facility from user profile, fallback to first facility
         try:
-            facility = Facility.objects.get(user=request.user)
-        except (Facility.DoesNotExist, FieldError):
+            user_profile = request.user.profile
+            if user_profile.facility:
+                facility = user_profile.facility
+            else:
+                facility = Facility.objects.first()
+        except AttributeError:
             facility = Facility.objects.first()
             
         if not facility:
@@ -213,7 +263,14 @@ def confirm_case(request, case_id):
         routing_id = case_id.replace('FR-', '')
         routing = FacilityRouting.objects.select_related('assigned_facility').get(id=int(routing_id))
         
-        facility = Facility.objects.get(user=request.user)
+        # Get facility from user profile
+        try:
+            user_profile = request.user.profile
+            if not user_profile.facility:
+                return Response({'error': 'User is not linked to a facility'}, status=403)
+            facility = user_profile.facility
+        except AttributeError:
+            return Response({'error': 'User is not linked to a facility'}, status=403)
         if routing.assigned_facility_id != facility.id:
             return Response({'error': 'Not allowed'}, status=403)
         
@@ -246,7 +303,14 @@ def reject_case(request, case_id):
         routing_id = case_id.replace('FR-', '')
         routing = FacilityRouting.objects.select_related('assigned_facility').get(id=int(routing_id))
         
-        facility = Facility.objects.get(user=request.user)
+        # Get facility from user profile
+        try:
+            user_profile = request.user.profile
+            if not user_profile.facility:
+                return Response({'error': 'User is not linked to a facility'}, status=403)
+            facility = user_profile.facility
+        except AttributeError:
+            return Response({'error': 'User is not linked to a facility'}, status=403)
         if routing.assigned_facility_id != facility.id:
             return Response({'error': 'Not allowed'}, status=403)
         
@@ -277,7 +341,14 @@ def acknowledge_case(request, case_id):
         routing_id = case_id.replace('FR-', '')
         routing = FacilityRouting.objects.select_related('assigned_facility').get(id=int(routing_id))
         
-        facility = Facility.objects.get(user=request.user)
+        # Get facility from user profile
+        try:
+            user_profile = request.user.profile
+            if not user_profile.facility:
+                return Response({'error': 'User is not linked to a facility'}, status=403)
+            facility = user_profile.facility
+        except AttributeError:
+            return Response({'error': 'User is not linked to a facility'}, status=403)
         if routing.assigned_facility_id != facility.id:
             return Response({'error': 'Not allowed'}, status=403)
         
@@ -308,7 +379,14 @@ def delete_case(request, case_id):
         routing_id = case_id.replace('FR-', '')
         routing = FacilityRouting.objects.select_related('assigned_facility').get(id=int(routing_id))
         
-        facility = Facility.objects.get(user=request.user)
+        # Get facility from user profile
+        try:
+            user_profile = request.user.profile
+            if not user_profile.facility:
+                return Response({'error': 'User is not linked to a facility'}, status=403)
+            facility = user_profile.facility
+        except AttributeError:
+            return Response({'error': 'User is not linked to a facility'}, status=403)
         if routing.assigned_facility_id != facility.id:
             return Response({'error': 'Not allowed'}, status=403)
         
@@ -326,23 +404,3 @@ def delete_case(request, case_id):
         return Response({'error': 'Invalid case id'}, status=400)
     except Exception as e:
         return Response({'error': str(e)}, status=500)
-    
-    def get_queryset(self):
-        """
-        Optionally filter out inactive facilities unless explicitly requested.
-        """
-        queryset = Facility.objects.all()
-        show_inactive = self.request.query_params.get('show_inactive', 'false').lower() == 'true'
-        
-        if not show_inactive:
-            queryset = queryset.filter(is_active=True)
-            
-        return queryset
-    
-    def perform_destroy(self, instance):
-        """
-        Soft delete facility by setting is_active to False instead of actual deletion.
-        """
-        instance.is_active = False
-        instance.save()
-        return Response(status=status.HTTP_204_NO_CONTENT)

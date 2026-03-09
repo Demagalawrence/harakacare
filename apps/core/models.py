@@ -66,3 +66,95 @@ class StatusModel(BaseModel):  # Inherits from BaseModel
         self.status = new_status
         self.status_reason = reason
         self.save()
+
+
+class UserProfile(models.Model):
+    """Extended user profile for facility association and roles"""
+    
+    class UserRole(models.TextChoices):
+        ADMIN = 'admin', 'System Administrator'
+        FACILITY_ADMIN = 'facility_admin', 'Facility Administrator'
+        DOCTOR = 'doctor', 'Doctor'
+        NURSE = 'nurse', 'Nurse'
+        CLINICAL_OFFICER = 'clinical_officer', 'Clinical Officer'
+        RECEPTIONIST = 'receptionist', 'Receptionist'
+        STAFF = 'staff', 'General Staff'
+    
+    user = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE,
+        related_name='profile'
+    )
+    
+    facility = models.ForeignKey(
+        'facilities.Facility',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='staff_members',
+        help_text='Facility where this user works'
+    )
+    
+    role = models.CharField(
+        max_length=20,
+        choices=UserRole.choices,
+        default=UserRole.STAFF,
+        help_text='User role within the facility'
+    )
+    
+    phone_number = models.CharField(
+        max_length=20,
+        blank=True,
+        null=True,
+        help_text='Contact phone number'
+    )
+    
+    license_number = models.CharField(
+        max_length=50,
+        blank=True,
+        null=True,
+        help_text='Professional license number (for medical staff)'
+    )
+    
+    department = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        help_text='Department within the facility'
+    )
+    
+    is_active_staff = models.BooleanField(
+        default=True,
+        help_text='Whether this staff member is currently active'
+    )
+    
+    can_view_all_facilities = models.BooleanField(
+        default=False,
+        help_text='Can view cases from all facilities (admin only)'
+    )
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = 'User Profile'
+        verbose_name_plural = 'User Profiles'
+    
+    def __str__(self):
+        facility_name = self.facility.name if self.facility else 'No Facility'
+        return f"{self.user.get_full_name() or self.user.username} - {facility_name}"
+    
+    def get_facility_cases_qs(self):
+        """Get queryset of cases for this user's facility"""
+        if not self.facility:
+            return None
+        from apps.triage.models import TriageSession
+        return TriageSession.objects.filter(assigned_facility=self.facility)
+    
+    def can_view_case(self, case):
+        """Check if user can view a specific case"""
+        if self.can_view_all_facilities:
+            return True
+        if not self.facility:
+            return False
+        return case.assigned_facility == self.facility

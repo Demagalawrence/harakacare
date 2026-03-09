@@ -19,23 +19,21 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
-from apps.core.views import force_migrations
-
+from apps.triage.admin import harakacare_admin
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
-    path('api/force-migrate/', force_migrations),
-    path('api/facilities/', include('apps.facilities.urls')),
-    path('api/v1/triage/', include('apps.triage.urls')),  # ADD THIS LINE
-    # path('messaging/', include('apps.messaging.urls')),  # Add this line    
-    # path("messaging/whatsapp/", include("apps.messaging.whatsapp.urls")),
-
+    path('admin/', admin.site.urls),  # Default Django admin
+    path('harakacare-admin/', harakacare_admin.urls),  # Custom HarakaCare admin
+    path('api/', include('apps.messaging.api_urls')),  # Chat API endpoints
+    path('api/facilities/', include('apps.facilities.urls')),  # Facility API endpoints
+    path('api/v1/triage/', include('apps.triage.urls')),  # Triage API endpoints
+    path('messaging/', include('apps.messaging.urls')),  # Messaging endpoints
+    path("messaging/whatsapp/", include("apps.messaging.whatsapp.urls")),  # WhatsApp endpoints
 ]
-
 
 # Add debug toolbar URLs in development
 if settings.DEBUG:
     import debug_toolbar
-    urlpatterns = [
+    urlpatterns += [
         path('__debug__/', include(debug_toolbar.urls)),
-    ] + urlpatterns
+    ]

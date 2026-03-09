@@ -208,10 +208,12 @@ else:
         'USE_GPU': False,
     }
 
-    
-#    # 360dialog credentials — get these from your 360dialog dashboard
-    THREESIXTY_DIALOG_API_KEY       = "9M3H8VXOBPYZQG2EP4VSNIOBM5GW5QEK"
-    THREESIXTY_DIALOG_BASE_URL      = "https://waba-sandbox.360dialog.io"       # sandbox
+# Meta WhatsApp Cloud API credentials
+META_WHATSAPP_ACCESS_TOKEN = env("META_WHATSAPP_ACCESS_TOKEN", default="")
+META_WHATSAPP_PHONE_NUMBER_ID = env("META_WHATSAPP_PHONE_NUMBER_ID", default="")
+META_WHATSAPP_WEBHOOK_VERIFY_TOKEN = env("META_WHATSAPP_WEBHOOK_VERIFY_TOKEN", default="harakacare_verify123")
+META_WHATSAPP_APP_SECRET = env("META_WHATSAPP_APP_SECRET", default="")
+META_WHATSAPP_BASE_URL = "https://graph.facebook.com"
 
 # CORS settings
 CORS_ALLOWED_ORIGINS = [
@@ -237,6 +239,8 @@ CORS_ALLOW_CREDENTIALS = True
 
 CORS_ALLOW_ALL_ORIGINS = True
 
-
+META_WHATSAPP_ACCESS_TOKEN = env("META_WHATSAPP_ACCESS_TOKEN", default="")
+META_WHATSAPP_PHONE_NUMBER_ID = env("META_WHATSAPP_PHONE_NUMBER_ID", default="")
+META_WHATSAPP_APP_SECRET = env("META_WHATSAPP_APP_SECRET", default="")  # Temporarily empty for testing
 
 print("🚀 Running in DEVELOPMENT mode")
