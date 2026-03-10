@@ -1,7 +1,18 @@
 {
   "version": 2,
-  "framework": "create-react-app",
-  "installCommand": "rm -rf node_modules package-lock.json && npm install",
-  "buildCommand": "npm run build",
-  "outputDirectory": "build"
+  "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "build"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/build/$1"
+    }
+  ]
 }
