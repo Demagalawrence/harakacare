@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import ChatInterface from './components/ChatInterface';
 import LandingPage from './components/LandingPage';
 import PatientTriage from './components/PatientTriage';
