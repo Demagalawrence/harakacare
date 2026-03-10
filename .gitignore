@@ -67,6 +67,9 @@ ehthumbs.db
 Thumbs.db
 
 # Frontend dependencies and build artifacts
+node_modules/
+build/
+package-lock.json
 frontend/node_modules/
 frontend/build/
 frontend/.env.local
