@@ -1,0 +1,13 @@
+{
+  "name": "harakacare",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "cd frontend && npm run build",
+    "start": "cd frontend && npm start",
+    "install": "cd frontend && npm install"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}
