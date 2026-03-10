@@ -1,4 +1,6 @@
 {
   "version": 2,
-  "framework": "create-react-app"
+  "framework": "create-react-app",
+  "installCommand": "rm -rf node_modules && npm install",
+  "buildCommand": "npm run build"
 }
