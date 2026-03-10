@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 import React, { useState, useEffect } from 'react';
 import { AlertCircle, Send, Activity, MapPin } from 'lucide-react';
 import { chatAPI } from '../services/chatAPI';

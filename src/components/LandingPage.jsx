@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 import React from 'react';
 import { MessageCircle, Globe, Activity } from 'lucide-react';
 import './LandingPage.css';
