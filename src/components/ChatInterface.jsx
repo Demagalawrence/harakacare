@@ -118,24 +118,6 @@ const ChatInterface = () => {
     }
   };
 
-  // Chat flow sequence - matches backend CONVERSATIONAL_REQUIRED priority
-  const chatFlow = [
-    { field: 'complaint_group', type: 'text', prompt: "Hello! I'm here to help assess your health concerns. Please describe your main symptoms or health issue." },
-    { field: 'age_group', type: 'menu', menuKey: 'age_group' },
-    { field: 'sex', type: 'menu', menuKey: 'sex' },
-    { field: 'severity', type: 'menu', menuKey: 'severity' },
-    { field: 'duration', type: 'menu', menuKey: 'duration' },
-    { field: 'progression_status', type: 'menu', menuKey: 'progression_status' },
-    { field: 'condition_occurrence', type: 'menu', menuKey: 'condition_occurrence' },
-    { field: 'allergies', type: 'menu', menuKey: 'allergies' },
-    { field: 'chronic_conditions', type: 'menu', menuKey: 'chronic_conditions_gate' },
-    { field: 'on_medication', type: 'menu', menuKey: 'on_medication' },
-    { field: 'location', type: 'text', prompt: "What is your location? Please provide your district and village." },
-    { field: 'village', type: 'text', prompt: "What is your specific village or area?" },
-    { field: 'consents', type: 'menu', menuKey: 'consents' },
-    { field: 'pregnancy_status', type: 'menu', menuKey: 'pregnancy_status', condition: (data) => data.sex === 'female' && ['teen', 'adult'].includes(data.age_group) }
-  ];
-
   useEffect(() => {
     // Generate patient token and show welcome message
     const token = `PT-${Date.now().toString(36).substr(-6).toUpperCase()}`;

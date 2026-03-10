@@ -1,7 +1,6 @@
 import React from 'react';
-import { Phone, MessageCircle, Globe, ChevronRight } from 'lucide-react';
+import { MessageCircle, Globe, Activity } from 'lucide-react';
 import './LandingPage.css';
-import { Activity, Building2 } from 'lucide-react';
 
 
 const LandingPage = () => {
