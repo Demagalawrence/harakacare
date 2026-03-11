@@ -130,13 +130,7 @@ The project uses ESLint for code consistency. Run:
 npm run lint
 ```
 
-## Demo Features
 
-The frontend includes mock data for demonstration purposes:
-- Sample patient cases with various risk levels
-- Interactive dashboard with filtering and search
-- Complete triage workflow with validation
-- Emergency alert system for red flag symptoms
 
 ## Contributing
 
