@@ -22,6 +22,7 @@ from django.conf import settings
 from django.http import JsonResponse
 from apps.triage.admin import harakacare_admin
 from apps.core.views import setup_production_api
+from apps.core.quick_setup import create_users_quick
 
 def api_info(request):
     """HarakaCare API Information"""
@@ -44,6 +45,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),  # Default Django admin
     path('harakacare-admin/', harakacare_admin.urls),  # Custom HarakaCare admin
     path('setup-production/', setup_production_api, name='setup_production'),  # Production setup endpoint
+    path('create-users/', create_users_quick, name='create_users'),  # Quick user creation
     path('api/', include('apps.messaging.api_urls')),  # Chat API endpoints
     path('api/facilities/', include('apps.facilities.urls')),  # Facility API endpoints
     path('api/v1/triage/', include('apps.triage.urls')),  # Triage API endpoints
