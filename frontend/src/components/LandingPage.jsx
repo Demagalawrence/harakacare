@@ -16,7 +16,7 @@ const LandingPage = () => {
           </div>
           
           <div className="nav-links">
-            <a href="/">How it Works</a>
+            <a href="https://www.youtube.com/watch?v=kiFreigRrkQ">How it Works</a>
             <a href="/facility" className="nav-link-secondary">Facility Login</a>
             <a href="/chat" className="btn-primary">Web Assesment</a>
           </div>
