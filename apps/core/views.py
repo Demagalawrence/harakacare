@@ -8,6 +8,31 @@ from django.db import connection
 
 @csrf_exempt
 @require_http_methods(["GET", "POST"])
+def setup_production_api(request):
+    """API endpoint to trigger production setup"""
+    try:
+        # Run the setup command
+        call_command('setup_production')
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'Production setup completed successfully!',
+            'credentials': {
+                'kampala_staff': 'kampala123',
+                'mulago_staff': 'mulago123', 
+                'luwero_staff': 'luwero123',
+                'admin': 'admin123'
+            }
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Setup failed: {str(e)}'
+        }, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["GET", "POST"])
 def force_migrations(request):
     """Force run migrations via API call - automatically called to ensure tables exist"""
     try:

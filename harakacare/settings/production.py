@@ -228,3 +228,23 @@ LOGGING = {
         'level': 'INFO',
     },
 }
+
+# Auto-setup production data on first run
+def setup_production_data():
+    """Automatically create production facilities and users"""
+    try:
+        from django.contrib.auth.models import User
+        from apps.facilities.models import Facility
+        from apps.core.models import UserProfile
+        
+        # Check if admin user exists
+        if not User.objects.filter(username='admin').exists():
+            # Run setup command
+            from django.core.management import call_command
+            call_command('setup_production')
+    except Exception:
+        # Silently fail if database is not ready yet
+        pass
+
+# Run setup when Django starts
+setup_production_data()
