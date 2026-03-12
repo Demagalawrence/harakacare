@@ -258,6 +258,43 @@ const FacilityDashboard = () => {
               Sign In
             </button>
           </form>
+
+          {/* Quick Login Buttons */}
+          <div className="mt-6 pt-6 border-t border-gray-200">
+            <p className="text-sm font-medium text-gray-700 mb-3">Quick Login (Demo Accounts):</p>
+            <div className="space-y-2">
+              <button 
+                onClick={() => setLoginForm({ username: 'kampala_staff', password: 'kampala123' })}
+                className="btn btn-secondary w-full text-left justify-start"
+              >
+                <div>
+                  <div className="font-medium">Kampala Referral Hospital</div>
+                  <div className="text-xs text-gray-600">kampala_staff / Medical Officer</div>
+                </div>
+              </button>
+              <button 
+                onClick={() => setLoginForm({ username: 'mulago_staff', password: 'mulago123' })}
+                className="btn btn-secondary w-full text-left justify-start"
+              >
+                <div>
+                  <div className="font-medium">Mulago National Hospital</div>
+                  <div className="text-xs text-gray-600">mulago_staff / Nurse</div>
+                </div>
+              </button>
+              <button 
+                onClick={() => setLoginForm({ username: 'luwero_staff', password: 'luwero123' })}
+                className="btn btn-secondary w-full text-left justify-start"
+              >
+                <div>
+                  <div className="font-medium">Luwero General Hospital</div>
+                  <div className="text-xs text-gray-600">luwero_staff / Nurse Midwife</div>
+                </div>
+              </button>
+            </div>
+            <p className="text-xs text-gray-500 mt-3 text-center">
+              Click any button above to auto-fill credentials, then click "Sign In"
+            </p>
+          </div>
         </div>
       </div>
     );

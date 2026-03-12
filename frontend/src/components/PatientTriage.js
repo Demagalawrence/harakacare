@@ -99,7 +99,14 @@ const PatientTriage = () => {
   ];
 
   const districts = [
-    'Luwero'
+    'Kampala',
+    'Wakiso', 
+    'Mpigi',
+    'Mukono',
+    'Buikwe',
+    'Luwero',
+    'Nakasongola',
+    'Kayunga'
   ];
 
   useEffect(() => {
