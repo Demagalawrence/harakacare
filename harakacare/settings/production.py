@@ -229,145 +229,156 @@ LOGGING = {
     },
 }
 
-# Auto-setup production data on first run
+# Auto-setup production data on EVERY app start (bulletproof)
 def setup_production_data():
-    """Automatically create production facilities and users"""
+    """Automatically create production facilities and users on every start"""
     try:
         from django.contrib.auth.models import User
         from apps.facilities.models import Facility
         from apps.core.models import UserProfile
         from django.core.management import call_command
         
-        # Always run migrations first
-        call_command('migrate', verbosity=0, interactive=False)
+        # ALWAYS run migrations first
+        call_command('migrate', verbosity=0, interactive=False, run_syncdb=True)
         
-        # Check if admin user exists, if not create all data
-        if not User.objects.filter(username='admin').exists():
-            # Create facilities
-            facilities_data = [
-                {
-                    'name': 'Kampala Referral Hospital',
-                    'facility_type': 'referral_hospital',
-                    'address': 'Kampala, Uganda (Serves: Kampala, Wakiso, Mpigi)',
-                    'district': 'Kampala',
-                    'phone_number': '+256414123456',
-                    'total_beds': 500,
-                    'available_beds': 150,
-                    'staff_count': 200,
-                    'ambulance_available': True,
-                    'services_offered': ['emergency', 'general_medicine', 'surgery', 'obstetrics', 'maternal_health'],
-                },
-                {
-                    'name': 'Mulago National Hospital',
-                    'facility_type': 'national_referral',
-                    'address': 'Mulago, Kampala (Serves: Kampala, Mukono, Buikwe)',
-                    'district': 'Kampala',
-                    'phone_number': '+256414789012',
-                    'total_beds': 800,
-                    'available_beds': 200,
-                    'staff_count': 350,
-                    'ambulance_available': True,
-                    'services_offered': ['emergency', 'general_medicine', 'surgery', 'pediatrics', 'obstetrics'],
-                },
-                {
-                    'name': 'Luwero General Hospital',
-                    'facility_type': 'general_hospital',
-                    'address': 'Luwero Town (Serves: Luwero, Nakasongola, Kayunga)',
-                    'district': 'Luwero',
-                    'phone_number': '+256414555666',
-                    'total_beds': 100,
-                    'available_beds': 50,
-                    'staff_count': 75,
-                    'ambulance_available': True,
-                    'services_offered': ['emergency', 'general_medicine', 'obstetrics', 'maternal_health'],
-                }
-            ]
-            
-            for facility_data in facilities_data:
-                facility, created = Facility.objects.get_or_create(
-                    name=facility_data['name'],
-                    defaults=facility_data
-                )
-            
-            # Create users
-            users_data = [
-                {
-                    'username': 'kampala_staff',
-                    'password': 'kampala123',
-                    'email': 'staff@kampalareferral.ug',
-                    'first_name': 'John',
-                    'last_name': 'Ochieng',
-                    'facility_name': 'Kampala Referral Hospital',
-                    'role': 'medical_officer',
-                    'department': 'Emergency',
-                },
-                {
-                    'username': 'mulago_staff',
-                    'password': 'mulago123',
-                    'email': 'staff@mulago.go.ug',
-                    'first_name': 'Sarah',
-                    'last_name': 'Nakato',
-                    'facility_name': 'Mulago National Hospital',
-                    'role': 'nurse',
-                    'department': 'Emergency',
-                },
-                {
-                    'username': 'luwero_staff',
-                    'password': 'luwero123',
-                    'email': 'staff@luwerohospital.ug',
-                    'first_name': 'Grace',
-                    'last_name': 'Nakintu',
-                    'facility_name': 'Luwero General Hospital',
-                    'role': 'nurse_midwife',
-                    'department': 'Maternity',
-                }
-            ]
-            
-            for user_data in users_data:
-                user, user_created = User.objects.get_or_create(
-                    username=user_data['username'],
-                    defaults={
-                        'email': user_data['email'],
-                        'first_name': user_data['first_name'],
-                        'last_name': user_data['last_name'],
-                        'is_staff': True,
-                    }
-                )
-                
-                if user_created:
-                    user.set_password(user_data['password'])
-                    user.save()
-                
-                # Create profile
-                facility = Facility.objects.get(name=user_data['facility_name'])
-                profile, profile_created = UserProfile.objects.get_or_create(
-                    user=user,
-                    defaults={
-                        'facility': facility,
-                        'role': user_data['role'],
-                        'department': user_data['department'],
-                        'phone_number': '+256700000000',
-                        'is_active_staff': True,
-                        'can_view_all_facilities': False,
-                    }
-                )
-            
-            # Create admin user
-            admin_user, admin_created = User.objects.get_or_create(
-                username='admin',
+        # ALWAYS create facilities (idempotent)
+        facilities_data = [
+            {
+                'name': 'Kampala Referral Hospital',
+                'facility_type': 'referral_hospital',
+                'address': 'Kampala, Uganda (Serves: Kampala, Wakiso, Mpigi)',
+                'district': 'Kampala',
+                'phone_number': '+256414123456',
+                'total_beds': 500,
+                'available_beds': 150,
+                'staff_count': 200,
+                'ambulance_available': True,
+                'services_offered': ['emergency', 'general_medicine', 'surgery', 'obstetrics', 'maternal_health'],
+            },
+            {
+                'name': 'Mulago National Hospital',
+                'facility_type': 'national_referral',
+                'address': 'Mulago, Kampala (Serves: Kampala, Mukono, Buikwe)',
+                'district': 'Kampala',
+                'phone_number': '+256414789012',
+                'total_beds': 800,
+                'available_beds': 200,
+                'staff_count': 350,
+                'ambulance_available': True,
+                'services_offered': ['emergency', 'general_medicine', 'surgery', 'pediatrics', 'obstetrics'],
+            },
+            {
+                'name': 'Luwero General Hospital',
+                'facility_type': 'general_hospital',
+                'address': 'Luwero Town (Serves: Luwero, Nakasongola, Kayunga)',
+                'district': 'Luwero',
+                'phone_number': '+256414555666',
+                'total_beds': 100,
+                'available_beds': 50,
+                'staff_count': 75,
+                'ambulance_available': True,
+                'services_offered': ['emergency', 'general_medicine', 'obstetrics', 'maternal_health'],
+            }
+        ]
+        
+        for facility_data in facilities_data:
+            facility, created = Facility.objects.get_or_create(
+                name=facility_data['name'],
+                defaults=facility_data
+            )
+        
+        # ALWAYS create users (idempotent)
+        users_data = [
+            {
+                'username': 'kampala_staff',
+                'password': 'kampala123',
+                'email': 'staff@kampalareferral.ug',
+                'first_name': 'John',
+                'last_name': 'Ochieng',
+                'facility_name': 'Kampala Referral Hospital',
+                'role': 'medical_officer',
+                'department': 'Emergency',
+            },
+            {
+                'username': 'mulago_staff',
+                'password': 'mulago123',
+                'email': 'staff@mulago.go.ug',
+                'first_name': 'Sarah',
+                'last_name': 'Nakato',
+                'facility_name': 'Mulago National Hospital',
+                'role': 'nurse',
+                'department': 'Emergency',
+            },
+            {
+                'username': 'luwero_staff',
+                'password': 'luwero123',
+                'email': 'staff@luwerohospital.ug',
+                'first_name': 'Grace',
+                'last_name': 'Nakintu',
+                'facility_name': 'Luwero General Hospital',
+                'role': 'nurse_midwife',
+                'department': 'Maternity',
+            }
+        ]
+        
+        for user_data in users_data:
+            user, user_created = User.objects.get_or_create(
+                username=user_data['username'],
                 defaults={
-                    'email': 'admin@harakacare.ug',
+                    'email': user_data['email'],
+                    'first_name': user_data['first_name'],
+                    'last_name': user_data['last_name'],
                     'is_staff': True,
-                    'is_superuser': True,
                 }
             )
             
-            if admin_created:
-                admin_user.set_password('admin123')
-                admin_user.save()
+            # ALWAYS update password (fresh every time)
+            user.set_password(user_data['password'])
+            user.save()
+            
+            # Create/update profile
+            facility = Facility.objects.get(name=user_data['facility_name'])
+            profile, profile_created = UserProfile.objects.get_or_create(
+                user=user,
+                defaults={
+                    'facility': facility,
+                    'role': user_data['role'],
+                    'department': user_data['department'],
+                    'phone_number': '+256700000000',
+                    'is_active_staff': True,
+                    'can_view_all_facilities': False,
+                }
+            )
+            
+            # Update profile facility assignment
+            if not profile_created:
+                profile.facility = facility
+                profile.role = user_data['role']
+                profile.department = user_data['department']
+                profile.is_active_staff = True
+                profile.save()
+        
+        # ALWAYS create/update admin user
+        admin_user, admin_created = User.objects.get_or_create(
+            username='admin',
+            defaults={
+                'email': 'admin@harakacare.ug',
+                'is_staff': True,
+                'is_superuser': True,
+            }
+        )
+        
+        # ALWAYS update admin password
+        admin_user.set_password('admin123')
+        admin_user.is_staff = True
+        admin_user.is_superuser = True
+        admin_user.save()
                 
     except Exception as e:
-        # Silently fail if database is not ready yet
+        # Log error but don't crash
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Setup error (but app continues): {str(e)}")
         pass
 
 # Run setup when Django starts
