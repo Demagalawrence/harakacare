@@ -141,5 +141,4 @@ npm run lint
 5. Maintain accessibility standards
 
 ## Support
-
-For questions or issues related to the frontend implementation, please refer to the project documentation or contact the development team.
+bugema University 
