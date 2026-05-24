@@ -2,7 +2,7 @@
 
 A modern React-based frontend for the HarakaCare healthcare triage and facility management system.
 
-## Features
+## Features.
 
 ### Patient + Triage Agent
 - **Step-by-step symptom assessment** with intuitive UI
