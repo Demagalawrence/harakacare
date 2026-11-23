@@ -543,6 +543,17 @@ class ChatAssessmentService:
             return self._complete_assessment(conv, state)
 
         question = q["question"]
+        asked = state.setdefault("asked_questions", [])
+        # Prevent infinite loops: if this question was already asked, complete.
+        if question in asked:
+            return self._complete_assessment(conv, state)
+        # Hard cap on adaptive turns to avoid runaway conversations.
+        turns = state.get("adaptive_turns", 0)
+        if turns >= 8:
+            return self._complete_assessment(conv, state)
+        state["adaptive_turns"] = turns + 1
+        asked.append(question)
+
         state["pending_question"] = q
         state["stage"] = "adaptive"
         state["patient_data"] = patient_data
