@@ -8,7 +8,7 @@ class Command(BaseCommand):
     help = 'Create production facilities and users automatically'
 
     def handle(self, *args, **options):
-        self.stdout.write('🚀 Setting up HarakaCare Production Environment...')
+        self.stdout.write('[ROCKET] Setting up HarakaCare Production Environment...')
         
         # Create facilities
         facilities_data = [
@@ -55,7 +55,7 @@ class Command(BaseCommand):
                 name=facility_data['name'],
                 defaults=facility_data
             )
-            status = '✅ Created' if created else '📋 Found'
+            status = '[OK] Created' if created else '[CLIPBOARD] Found'
             self.stdout.write(f'{status} facility: {facility.name}')
         
         # Create users
@@ -106,9 +106,9 @@ class Command(BaseCommand):
             if user_created:
                 user.set_password(user_data['password'])
                 user.save()
-                self.stdout.write(f'✅ Created user: {user.username}')
+                self.stdout.write(f'[OK] Created user: {user.username}')
             else:
-                self.stdout.write(f'📋 User exists: {user.username}')
+                self.stdout.write(f'[CLIPBOARD] User exists: {user.username}')
             
             # Create profile
             facility = Facility.objects.get(name=user_data['facility_name'])
@@ -125,7 +125,7 @@ class Command(BaseCommand):
             )
             
             if profile_created:
-                self.stdout.write(f'✅ Created profile for: {user.username}')
+                self.stdout.write(f'[OK] Created profile for: {user.username}')
         
         # Create admin
         admin_user, admin_created = User.objects.get_or_create(
@@ -140,12 +140,12 @@ class Command(BaseCommand):
         if admin_created:
             admin_user.set_password('admin123')
             admin_user.save()
-            self.stdout.write('✅ Created admin user: admin/admin123')
+            self.stdout.write('[OK] Created admin user: admin/admin123')
         else:
-            self.stdout.write('📋 Admin user exists: admin')
+            self.stdout.write('[CLIPBOARD] Admin user exists: admin')
         
-        self.stdout.write('\n✅ Production Setup Complete!')
-        self.stdout.write('\n🔑 Login Credentials:')
+        self.stdout.write('\n[OK] Production Setup Complete!')
+        self.stdout.write('\n[UNLOCK] Login Credentials:')
         self.stdout.write('   Kampala Referral Hospital: kampala_staff / kampala123')
         self.stdout.write('   Mulago National Hospital: mulago_staff / mulago123')
         self.stdout.write('   Luwero General Hospital: luwero_staff / luwero123')

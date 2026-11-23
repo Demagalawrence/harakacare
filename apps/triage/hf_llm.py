@@ -6,7 +6,7 @@ from huggingface_hub import InferenceClient
 load_dotenv()
 HF_TOKEN = os.getenv("HF_TOKEN")
 
-# ✅ InferenceClient handles routing automatically
+# [OK] InferenceClient handles routing automatically
 client = InferenceClient(
     model="Qwen/Qwen2.5-7B-Instruct",
     token=HF_TOKEN

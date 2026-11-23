@@ -241,7 +241,7 @@ class RedFlagDetectionTool:
         age_group = getattr(session, 'age_group', triage_data.get('age_group', 'adult'))
         sex = getattr(session, 'sex', triage_data.get('sex', 'other'))
         
-        print(f"\n🔍 RED FLAG DETECTION - Age: {age_group}, Sex: {sex}")
+        print(f"\n[SEARCH] RED FLAG DETECTION - Age: {age_group}, Sex: {sex}")
 
         # ====================================================================
         # Check all detection sources
@@ -314,7 +314,7 @@ class RedFlagDetectionTool:
                             confidence=1.0,
                             context={'indicator': indicator}
                         )
-                        print(f"  ⚠️ Red flag from indicator: {flag_name}")
+                        print(f"  WARNING: Red flag from indicator: {flag_name}")
 
     def _check_complaint_text(self, session, data: Dict[str, Any], age_group: str) -> None:
         """Check complaint text for red flag keywords"""
@@ -343,7 +343,7 @@ class RedFlagDetectionTool:
                         confidence=0.8,
                         context={'keyword': keyword}
                     )
-                    print(f"  ⚠️ Red flag from keyword '{keyword}': {flag_name}")
+                    print(f"  WARNING: Red flag from keyword '{keyword}': {flag_name}")
                     break
 
     def _check_severity_duration(self, session, data: Dict[str, Any], age_group: str, sex: str) -> None:
@@ -376,7 +376,7 @@ class RedFlagDetectionTool:
                             confidence=0.9,
                             context={'severity': severity, 'complaint': complaint_group}
                         )
-                        print(f"  ⚠️ Severity escalation: {flag_name}")
+                        print(f"  WARNING: Severity escalation: {flag_name}")
         
         # Prolonged severe symptoms
         if severity in ['severe', 'very_severe'] and duration in ['more_than_1_week', 'more_than_1_month']:
@@ -395,7 +395,7 @@ class RedFlagDetectionTool:
                 confidence=0.85,
                 context={'duration': duration, 'severity': severity}
             )
-            print(f"  ⚠️ Prolonged severe symptoms")
+            print(f"  WARNING: Prolonged severe symptoms")
 
     def _check_age_specific_flags(self, session, data: Dict[str, Any], age_group: str) -> None:
         """Check age-specific red flags (WHO IMCI)"""
@@ -633,14 +633,14 @@ class RedFlagDetectionTool:
                 flags_text += f" and {len(urgent_flags)-2} other concerns"
             
             return (
-                f"⚠️ URGENT: {flags_text}. "
+                f"WARNING: URGENT: {flags_text}. "
                 f"You need urgent medical attention. "
                 f"Please go to a hospital or health center TODAY."
             )
         
         else:
             return (
-                f"⚠️ ATTENTION: We have identified some concerning symptoms. "
+                f"WARNING: ATTENTION: We have identified some concerning symptoms. "
                 f"Please seek medical evaluation soon."
             )
 

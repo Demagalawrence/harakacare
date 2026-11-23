@@ -19,13 +19,13 @@ def test_facility_api():
         print(f"   Status: {response.status_code}")
         if response.status_code == 200:
             facilities = response.json()
-            print(f"   ✅ Found {len(facilities)} facilities")
+            print(f"   [OK] Found {len(facilities)} facilities")
             for facility in facilities[:2]:  # Show first 2
                 print(f"      🏥 {facility['name']} - {facility['facility_type']}")
         else:
-            print(f"   ❌ Error: {response.text}")
+            print(f"   [ERROR] Error: {response.text}")
     except Exception as e:
-        print(f"   ❌ Exception: {str(e)}")
+        print(f"   [ERROR] Exception: {str(e)}")
     
     # Test 2: Admin panel
     print("\n2️⃣ Admin Panel:")
@@ -33,15 +33,15 @@ def test_facility_api():
         response = requests.get(f"{BASE_URL}/admin/", timeout=10)
         print(f"   Status: {response.status_code}")
         if response.status_code == 200:
-            print("   ✅ Admin panel accessible")
+            print("   [OK] Admin panel accessible")
         else:
-            print(f"   ❌ Admin panel error")
+            print(f"   [ERROR] Admin panel error")
     except Exception as e:
-        print(f"   ❌ Exception: {str(e)}")
+        print(f"   [ERROR] Exception: {str(e)}")
 
 def test_models_import():
     """Test that all models can be imported"""
-    print("\n🔧 Testing Model Imports")
+    print("\n[GUN] Testing Model Imports")
     print("=" * 50)
     
     try:
@@ -57,12 +57,12 @@ def test_models_import():
             FacilityNotification, FacilityCapacityLog
         )
         
-        print("   ✅ All models imported successfully!")
-        print(f"   📊 Facility: {Facility._meta.verbose_name_plural}")
-        print(f"   🔄 FacilityRouting: {FacilityRouting._meta.verbose_name_plural}")
+        print("   [OK] All models imported successfully!")
+        print(f"   [CHART] Facility: {Facility._meta.verbose_name_plural}")
+        print(f"   [BUG] FacilityRouting: {FacilityRouting._meta.verbose_name_plural}")
         print(f"   🎯 FacilityCandidate: {FacilityCandidate._meta.verbose_name_plural}")
         print(f"   📢 FacilityNotification: {FacilityNotification._meta.verbose_name_plural}")
-        print(f"   📋 FacilityCapacityLog: {FacilityCapacityLog._meta.verbose_name_plural}")
+        print(f"   [CLIPBOARD] FacilityCapacityLog: {FacilityCapacityLog._meta.verbose_name_plural}")
         
         # Test model counts
         facility_count = Facility.objects.count()
@@ -73,11 +73,11 @@ def test_models_import():
         print(f"      Routings: {routing_count}")
         
     except Exception as e:
-        print(f"   ❌ Import error: {str(e)}")
+        print(f"   [ERROR] Import error: {str(e)}")
 
 def main():
     """Run all tests"""
-    print("🚀 HarakaCare Facility Agent - Cleaned API Test")
+    print("[ROCKET] HarakaCare Facility Agent - Cleaned API Test")
     print("=" * 60)
     
     test_models_import()
@@ -85,24 +85,24 @@ def main():
     
     print("\n" + "=" * 60)
     print("🎉 Test Summary:")
-    print("   ✅ Unused model files removed")
-    print("   ✅ All imports updated to use single models.py")
-    print("   ✅ Server running successfully")
-    print("   ✅ API endpoints accessible")
-    print("   ✅ All models working correctly")
+    print("   [OK] Unused model files removed")
+    print("   [OK] All imports updated to use single models.py")
+    print("   [OK] Server running successfully")
+    print("   [OK] API endpoints accessible")
+    print("   [OK] All models working correctly")
     
-    print("\n📋 Cleaned Up Models:")
-    print("   🗑️  Removed: models_facility_agent.py (duplicate)")
-    print("   🗑️  Removed: models_simple.py (test only)")
-    print("   🗑️  Removed: models_backup.py (backup)")
-    print("   ✅ Kept: models.py (all 5 models consolidated)")
+    print("\n[CLIPBOARD] Cleaned Up Models:")
+    print("   [BACK]️  Removed: models_facility_agent.py (duplicate)")
+    print("   [BACK]️  Removed: models_simple.py (test only)")
+    print("   [BACK]️  Removed: models_backup.py (backup)")
+    print("   [OK] Kept: models.py (all 5 models consolidated)")
     
     print("\n🏗️ Current Active Models:")
     print("   🏥 Facility - Core facility data")
-    print("   🔄 FacilityRouting - Patient case routing")
+    print("   [BUG] FacilityRouting - Patient case routing")
     print("   🎯 FacilityCandidate - Matching candidates")
     print("   📢 FacilityNotification - Communication tracking")
-    print("   📋 FacilityCapacityLog - Audit trail")
+    print("   [CLIPBOARD] FacilityCapacityLog - Audit trail")
 
 if __name__ == "__main__":
     main()

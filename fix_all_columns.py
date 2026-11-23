@@ -40,27 +40,27 @@ missing_columns = [
     'geocoding_longitude'
 ]
 
-print("🔧 Adding all missing columns to triage_triagesession...")
+print("[GUN] Adding all missing columns to triage_triagesession...")
 
 for column in missing_columns:
     try:
         with connection.cursor() as cursor:
             cursor.execute(f"ALTER TABLE triage_triagesession ADD COLUMN {column} TEXT")
-            print(f"✅ Added {column}")
+            print(f"[OK] Added {column}")
     except Exception as e:
         if "duplicate column name" in str(e).lower():
-            print(f"✅ {column} already exists")
+            print(f"[OK] {column} already exists")
         else:
-            print(f"❌ Error adding {column}: {e}")
+            print(f"[ERROR] Error adding {column}: {e}")
 
-print("\n📋 Checking final table structure...")
+print("\n[CLIPBOARD] Checking final table structure...")
 try:
     with connection.cursor() as cursor:
         cursor.execute("PRAGMA table_info(triage_triagesession)")
         columns = [row[1] for row in cursor.fetchall()]
-        print(f"📋 Total columns: {len(columns)}")
-        print(f"📋 Columns: {sorted(columns)}")
+        print(f"[CLIPBOARD] Total columns: {len(columns)}")
+        print(f"[CLIPBOARD] Columns: {sorted(columns)}")
 except Exception as e:
-    print(f"❌ Error checking table: {e}")
+    print(f"[ERROR] Error checking table: {e}")
 
 print("\n🎉 Column fixing complete!")

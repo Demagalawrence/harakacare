@@ -84,7 +84,7 @@ class Command(BaseCommand):
             facility_user.groups.add(facility_staff)
             self.stdout.write(self.style.SUCCESS('Created sample facility staff user: facility_staff/staff123'))
 
-        self.stdout.write(self.style.SUCCESS('✅ HarakaCare admin setup complete!'))
+        self.stdout.write(self.style.SUCCESS('[OK] HarakaCare admin setup complete!'))
         self.stdout.write('\nAccess URLs:')
         self.stdout.write('  Default Django Admin: /admin/')
         self.stdout.write('  HarakaCare Clinical Dashboard: /harakacare-admin/')

@@ -8,7 +8,7 @@ STRUCTURED_MENUS = {
     "age_sex_gate": {
         "prompt": (
             "First, I need to know who we're helping. Please select:\n"
-            "👤 AGE (select number):\n"
+            "[USER] AGE (select number):\n"
             "1️⃣ Newborn (0-2 months)\n"
             "2️⃣ Infant (3-11 months)\n"
             "3️⃣ Child (1-5 years)\n"
@@ -92,13 +92,13 @@ def resolve_menu(field_name, user_input):
 
 def test_menu_resolution():
     """Test the menu resolution accuracy"""
-    print("🧪 TESTING MENU RESOLUTION ACCURACY")
+    print("[TEST_TUBE] TESTING MENU RESOLUTION ACCURACY")
     print("=" * 60)
     
     all_passed = True
     
     # Test age_sex_gate
-    print("\n📝 AGE/SEX GATE TESTS:")
+    print("\n[MEMO] AGE/SEX GATE TESTS:")
     age_menu = STRUCTURED_MENUS["age_sex_gate"]
     
     test_cases = [
@@ -117,11 +117,11 @@ def test_menu_resolution():
         matched, result = resolve_menu("age_sex_gate", input_val)
         
         if matched and result == expected:
-            print(f"  ✅ PASS: '{input_val}' -> {result}")
+            print(f"  [OK] PASS: '{input_val}' -> {result}")
         elif matched:
-            print(f"  ❌ FAIL: '{input_val}' -> {result} (expected {expected})")
+            print(f"  [ERROR] FAIL: '{input_val}' -> {result} (expected {expected})")
         else:
-            print(f"  ⚠️  NOT RECOGNIZED: '{input_val}'")
+            print(f"  WARNING:  NOT RECOGNIZED: '{input_val}'")
             all_passed = False
     
     # Test pregnancy_status
@@ -139,15 +139,15 @@ def test_menu_resolution():
         matched, result = resolve_menu("pregnancy_status", input_val)
         
         if matched and result == expected:
-            print(f"  ✅ PASS: '{input_val}' -> {result}")
+            print(f"  [OK] PASS: '{input_val}' -> {result}")
         elif matched:
-            print(f"  ❌ FAIL: '{input_val}' -> {result} (expected {expected})")
+            print(f"  [ERROR] FAIL: '{input_val}' -> {result} (expected {expected})")
         else:
-            print(f"  ⚠️  NOT RECOGNIZED: '{input_val}'")
+            print(f"  WARNING:  NOT RECOGNIZED: '{input_val}'")
             all_passed = False
     
     # Test other menus
-    print("\n📋 OTHER MENU TESTS:")
+    print("\n[CLIPBOARD] OTHER MENU TESTS:")
     other_menus = ["severity", "duration", "progression_status", "allergies", "on_medication", "consents"]
     
     for menu_name in other_menus:
@@ -158,17 +158,17 @@ def test_menu_resolution():
             # Test first 3 options
             for i, (key, expected) in enumerate(list(menu["options"].items())[:3]):
                 matched, result = resolve_menu(menu_name, key)
-                status = "✅" if matched and result == expected else "❌" if not matched else "⚠️"
+                status = "[OK]" if matched and result == expected else "[ERROR]" if not matched else "WARNING:"
                 print(f"    {key}: {result} {status}")
     
     print("\n" + "=" * 60)
     
     if all_passed:
         print("🎉 ALL TESTS PASSED!")
-        print("✅ Menu resolution working correctly")
+        print("[OK] Menu resolution working correctly")
     else:
-        print("⚠️  SOME TESTS FAILED!")
-        print("❌ Menu resolution needs fixes")
+        print("WARNING:  SOME TESTS FAILED!")
+        print("[ERROR] Menu resolution needs fixes")
     
     print("\n" + "=" * 60)
     print("🎯 MENU RESOLUTION TEST COMPLETE")

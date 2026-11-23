@@ -45,6 +45,18 @@ export const patientAPI = {
     const response = await api.get(`/patients/${patientToken}/history/`);
     return response.data;
   },
+
+  // Start conversational triage chat
+  startChat: async () => {
+    const response = await api.post('/v1/triage/chat/');
+    return response.data;
+  },
+
+  // Continue conversational triage chat
+  continueChat: async (data) => {
+    const response = await api.post('/v1/triage/chat/', data);
+    return response.data;
+  },
 };
 
 // Facility dashboard auth endpoints (session-based)
@@ -130,6 +142,18 @@ export const authAPI = {
 
   refreshToken: async () => {
     const response = await api.post('/auth/refresh/');
+    return response.data;
+  },
+};
+
+// Chat API endpoints (standalone named export)
+export const chatAPI = {
+  startChat: async () => {
+    const response = await api.post('/v1/triage/chat/');
+    return response.data;
+  },
+  continueChat: async (data) => {
+    const response = await api.post('/v1/triage/chat/', data);
     return response.data;
   },
 };

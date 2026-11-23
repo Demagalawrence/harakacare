@@ -21,7 +21,7 @@ from apps.facilities.models import Facility
 
 def test_facility_matching():
     """Test facility matching functionality"""
-    print("🔍 Testing Facility Matching Tool...")
+    print("[SEARCH] Testing Facility Matching Tool...")
     
     # Create mock triage data
     triage_data = {
@@ -79,7 +79,7 @@ def test_facility_matching():
     service_score = matching_tool._calculate_service_score(mock_facility, mock_routing)
     print(f"   Service score: {service_score}")
     
-    print("✅ Facility Matching Tool tests completed!\n")
+    print("[OK] Facility Matching Tool tests completed!\n")
 
 
 def test_prioritization():
@@ -114,7 +114,7 @@ def test_prioritization():
     should_override = prioritization_tool.should_override_to_emergency(emergency_routing)
     print(f"   Emergency override for medium risk with red flags: {should_override}")
     
-    print("✅ Prioritization Tool tests completed!\n")
+    print("[OK] Prioritization Tool tests completed!\n")
 
 
 def test_notification_dispatch():
@@ -147,12 +147,12 @@ def test_notification_dispatch():
     payload = notification_tool._build_payload(mock_routing, mock_facility)
     print(f"   Payload keys: {list(payload.keys())}")
     
-    print("✅ Notification Dispatch Tool tests completed!\n")
+    print("[OK] Notification Dispatch Tool tests completed!\n")
 
 
 def test_logging_monitoring():
     """Test logging and monitoring functionality"""
-    print("📊 Testing Logging & Monitoring Tool...")
+    print("[CHART] Testing Logging & Monitoring Tool...")
     
     logging_tool = LoggingMonitoringTool()
     
@@ -173,7 +173,7 @@ def test_logging_monitoring():
     logging_tool.log_performance_metrics(metrics)
     print("   Performance metrics logged successfully")
     
-    print("✅ Logging & Monitoring Tool tests completed!\n")
+    print("[OK] Logging & Monitoring Tool tests completed!\n")
 
 
 def test_facility_model():
@@ -208,12 +208,12 @@ def test_facility_model():
     distance = facility.distance_to(-1.2850, 36.8300)
     print(f"   Distance to test location: {distance} km")
     
-    print("✅ Enhanced Facility Model tests completed!\n")
+    print("[OK] Enhanced Facility Model tests completed!\n")
 
 
 def main():
     """Run all tests"""
-    print("🚀 Starting HarakaCare Facility Agent Tests\n")
+    print("[ROCKET] Starting HarakaCare Facility Agent Tests\n")
     print("=" * 50)
     
     try:
@@ -225,16 +225,16 @@ def main():
         
         print("=" * 50)
         print("🎉 All tests completed successfully!")
-        print("\n📋 Test Summary:")
-        print("   ✅ Facility Model enhancements")
-        print("   ✅ Facility Matching Tool")
-        print("   ✅ Prioritization Tool")
-        print("   ✅ Notification Dispatch Tool")
-        print("   ✅ Logging & Monitoring Tool")
-        print("\n🔧 Ready for integration with Triage Agent!")
+        print("\n[CLIPBOARD] Test Summary:")
+        print("   [OK] Facility Model enhancements")
+        print("   [OK] Facility Matching Tool")
+        print("   [OK] Prioritization Tool")
+        print("   [OK] Notification Dispatch Tool")
+        print("   [OK] Logging & Monitoring Tool")
+        print("\n[GUN] Ready for integration with Triage Agent!")
         
     except Exception as e:
-        print(f"❌ Test failed with error: {str(e)}")
+        print(f"[ERROR] Test failed with error: {str(e)}")
         import traceback
         traceback.print_exc()
 

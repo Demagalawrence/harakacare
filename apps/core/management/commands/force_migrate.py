@@ -167,4 +167,4 @@ class Command(BaseCommand):
                 )
             """)
             
-        self.stdout.write(self.style.SUCCESS('✅ All triage tables created successfully!'))
+        self.stdout.write(self.style.SUCCESS('[OK] All triage tables created successfully!'))

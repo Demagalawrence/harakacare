@@ -64,7 +64,7 @@ def create_production_facilities():
             defaults=facility_data
         )
         created_facilities.append(facility)
-        print(f"✅ {'Created' if created else 'Found'} facility: {facility.name}")
+        print(f"[OK] {'Created' if created else 'Found'} facility: {facility.name}")
     
     return created_facilities
 
@@ -119,9 +119,9 @@ def create_production_users():
         if user_created:
             user.set_password(user_data['password'])
             user.save()
-            print(f"✅ Created user: {user.username}")
+            print(f"[OK] Created user: {user.username}")
         else:
-            print(f"📋 User already exists: {user.username}")
+            print(f"[CLIPBOARD] User already exists: {user.username}")
         
         # Create user profile
         facility = Facility.objects.get(name=user_data['facility_name'])
@@ -138,12 +138,12 @@ def create_production_users():
         )
         
         if profile_created:
-            print(f"✅ Created profile for: {user.username}")
+            print(f"[OK] Created profile for: {user.username}")
         else:
-            print(f"📋 Profile already exists for: {user.username}")
+            print(f"[CLIPBOARD] Profile already exists for: {user.username}")
         
         print(f"   🏥 Facility: {facility.name}")
-        print(f"   👤 Role: {user_data['role']}")
+        print(f"   [USER] Role: {user_data['role']}")
         print()
 
 def create_admin_user():
@@ -160,13 +160,13 @@ def create_admin_user():
     if created:
         admin_user.set_password('admin123')
         admin_user.save()
-        print("✅ Created admin user: admin/admin123")
+        print("[OK] Created admin user: admin/admin123")
     else:
-        print("📋 Admin user already exists: admin")
+        print("[CLIPBOARD] Admin user already exists: admin")
 
 def main():
     """Main setup function"""
-    print("🚀 Setting up HarakaCare Production Environment")
+    print("[ROCKET] Setting up HarakaCare Production Environment")
     print("=" * 50)
     
     # Create facilities
@@ -174,15 +174,15 @@ def main():
     facilities = create_production_facilities()
     
     # Create users
-    print("\n👤 Creating Users...")
+    print("\n[USER] Creating Users...")
     create_production_users()
     
     # Create admin
-    print("\n🔐 Creating Admin User...")
+    print("\n[LOCK] Creating Admin User...")
     create_admin_user()
     
-    print("\n✅ Production Setup Complete!")
-    print("\n🔑 Login Credentials:")
+    print("\n[OK] Production Setup Complete!")
+    print("\n[UNLOCK] Login Credentials:")
     print("   Kampala Referral Hospital: kampala_staff / kampala123")
     print("   Mulago National Hospital: mulago_staff / mulago123")
     print("   Luwero General Hospital: luwero_staff / luwero123")

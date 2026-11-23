@@ -90,7 +90,7 @@ def create_sample_facilities():
         # Check if facility already exists
         existing = Facility.objects.filter(name=facility_data['name']).first()
         if existing:
-            print(f"📝 Facility '{facility_data['name']}' already exists, updating...")
+            print(f"[MEMO] Facility '{facility_data['name']}' already exists, updating...")
             for key, value in facility_data.items():
                 setattr(existing, key, value)
             existing.save()
@@ -100,10 +100,10 @@ def create_sample_facilities():
             facility = Facility.objects.create(**facility_data)
             created_facilities.append(facility)
     
-    print(f"\n✅ Created/Updated {len(created_facilities)} facilities")
+    print(f"\n[OK] Created/Updated {len(created_facilities)} facilities")
     
     # Display created facilities
-    print("\n📋 Sample Facilities Created:")
+    print("\n[CLIPBOARD] Sample Facilities Created:")
     for facility in created_facilities:
         print(f"   🏥 {facility.name}")
         print(f"      Type: {facility.get_facility_type_display()}")
@@ -122,7 +122,7 @@ def test_facility_apis():
     
     BASE_URL = "http://127.0.0.1:8000"
     
-    print("🔍 Testing Facility API Endpoints...")
+    print("[SEARCH] Testing Facility API Endpoints...")
     print("=" * 50)
     
     # Test 1: Get all facilities
@@ -132,13 +132,13 @@ def test_facility_apis():
         print(f"   Status: {response.status_code}")
         if response.status_code == 200:
             facilities = response.json()
-            print(f"   ✅ Found {len(facilities)} facilities")
+            print(f"   [OK] Found {len(facilities)} facilities")
             for facility in facilities[:2]:  # Show first 2
                 print(f"      🏥 {facility['name']} - {facility['facility_type']}")
         else:
-            print(f"   ❌ Error: {response.text}")
+            print(f"   [ERROR] Error: {response.text}")
     except Exception as e:
-        print(f"   ❌ Exception: {str(e)}")
+        print(f"   [ERROR] Exception: {str(e)}")
     
     # Test 2: Get specific facility
     print("\n2️⃣ GET Specific Facility:")
@@ -147,13 +147,13 @@ def test_facility_apis():
         print(f"   Status: {response.status_code}")
         if response.status_code == 200:
             facility = response.json()
-            print(f"   ✅ Facility: {facility['name']}")
+            print(f"   [OK] Facility: {facility['name']}")
             print(f"      📍 Location: {facility['address']}")
             print(f"      🛏️  Beds: {facility['available_beds']}/{facility['total_beds']}")
         else:
-            print(f"   ❌ Error: {response.text}")
+            print(f"   [ERROR] Error: {response.text}")
     except Exception as e:
-        print(f"   ❌ Exception: {str(e)}")
+        print(f"   [ERROR] Exception: {str(e)}")
     
     # Test 3: Search facilities
     print("\n3️⃣ Search Facilities:")
@@ -162,13 +162,13 @@ def test_facility_apis():
         print(f"   Status: {response.status_code}")
         if response.status_code == 200:
             facilities = response.json()
-            print(f"   ✅ Found {len(facilities)} facilities in Nairobi")
+            print(f"   [OK] Found {len(facilities)} facilities in Nairobi")
             for facility in facilities:
                 print(f"      🏥 {facility['name']}")
         else:
-            print(f"   ❌ Error: {response.text}")
+            print(f"   [ERROR] Error: {response.text}")
     except Exception as e:
-        print(f"   ❌ Exception: {str(e)}")
+        print(f"   [ERROR] Exception: {str(e)}")
     
     # Test 4: Filter by facility type
     print("\n4️⃣ Filter by Facility Type:")
@@ -177,18 +177,18 @@ def test_facility_apis():
         print(f"   Status: {response.status_code}")
         if response.status_code == 200:
             facilities = response.json()
-            print(f"   ✅ Found {len(facilities)} hospitals")
+            print(f"   [OK] Found {len(facilities)} hospitals")
             for facility in facilities:
                 print(f"      🏥 {facility['name']} - {facility['available_beds']} beds available")
         else:
-            print(f"   ❌ Error: {response.text}")
+            print(f"   [ERROR] Error: {response.text}")
     except Exception as e:
-        print(f"   ❌ Exception: {str(e)}")
+        print(f"   [ERROR] Exception: {str(e)}")
 
 
 def demonstrate_facility_agent_workflow():
     """Demonstrate the complete Facility Agent workflow"""
-    print("\n🚀 Facility Agent Workflow Demonstration")
+    print("\n[ROCKET] Facility Agent Workflow Demonstration")
     print("=" * 50)
     
     # Simulate triage data
@@ -212,7 +212,7 @@ def demonstrate_facility_agent_workflow():
     print(f"   Location: {triage_data['patient_district']}")
     
     # Step 2: Facility Matching
-    print("\n🔍 Step 2: Facility Matching")
+    print("\n[SEARCH] Step 2: Facility Matching")
     facilities = Facility.objects.filter(is_active=True)
     
     candidates = []
@@ -245,7 +245,7 @@ def demonstrate_facility_agent_workflow():
         facility = candidate['facility']
         print(f"   {i}. {facility.name}")
         print(f"      📍 Distance: {candidate['distance_km']} km")
-        print(f"      📊 Match Score: {candidate['match_score']:.3f}")
+        print(f"      [CHART] Match Score: {candidate['match_score']:.3f}")
         print(f"      🛏️  Capacity: {candidate['has_capacity']}")
         print(f"      🚑 Emergency: {candidate['can_handle_emergency']}")
     
@@ -266,30 +266,30 @@ def demonstrate_facility_agent_workflow():
         
         # Step 4: Notification Simulation
         print("\n📢 Step 4: Facility Notification")
-        print(f"   ✅ Notification sent to {selected_facility.name}")
-        print(f"   📧 Subject: URGENT: New Patient Case - {triage_data['patient_token'][:8]}")
+        print(f"   [OK] Notification sent to {selected_facility.name}")
+        print(f"   [EMAIL] Subject: URGENT: New Patient Case - {triage_data['patient_token'][:8]}")
         print(f"   ⏰ Expected Response: 30 minutes (emergency case)")
         
         # Step 5: Facility Response Simulation
         print("\n🏥 Step 5: Facility Response")
-        print(f"   ✅ {selected_facility.name} ACCEPTED the case")
+        print(f"   [OK] {selected_facility.name} ACCEPTED the case")
         print(f"   🛏️  Bed Reserved: 1 bed in Emergency Department")
         print(f"   ⏰ Estimated Arrival: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
         
         # Step 6: Follow-up Notification
-        print("\n📱 Step 6: Follow-up Agent Notification")
-        print(f"   ✅ Follow-up Agent notified of successful routing")
+        print("\n[CAMERA] Step 6: Follow-up Agent Notification")
+        print(f"   [OK] Follow-up Agent notified of successful routing")
         print(f"   🎯 Priority: HIGH")
-        print(f"   📊 Status: CONFIRMED")
+        print(f"   [CHART] Status: CONFIRMED")
         
         print(f"\n🎉 Patient {triage_data['patient_token'][:8]} successfully routed to {selected_facility.name}!")
     else:
-        print("   ❌ No suitable facilities found")
+        print("   [ERROR] No suitable facilities found")
 
 
 def main():
     """Main function to run all demonstrations"""
-    print("🚀 HarakaCare Facility Agent - API Demonstration")
+    print("[ROCKET] HarakaCare Facility Agent - API Demonstration")
     print("=" * 60)
     
     # Create sample data
@@ -303,11 +303,11 @@ def main():
     
     print("\n" + "=" * 60)
     print("🎉 API Demonstration Complete!")
-    print("\n📋 What You Can Do:")
+    print("\n[CLIPBOARD] What You Can Do:")
     print("   🌐 Visit: http://127.0.0.1:8000/admin/ to manage facilities")
-    print("   🔍 API: http://127.0.0.1:8000/api/facilities/facilities/ to list facilities")
-    print("   📊 Monitor: Check server logs for routing activity")
-    print("   🚀 Test: Use the API to integrate with Triage Agent")
+    print("   [SEARCH] API: http://127.0.0.1:8000/api/facilities/facilities/ to list facilities")
+    print("   [CHART] Monitor: Check server logs for routing activity")
+    print("   [ROCKET] Test: Use the API to integrate with Triage Agent")
 
 
 if __name__ == "__main__":

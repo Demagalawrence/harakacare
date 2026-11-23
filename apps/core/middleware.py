@@ -168,7 +168,7 @@ class EnsureTablesMiddleware(MiddlewareMixin):
             )
         """)
         
-        print("✅ Automatically created missing triage tables")
+        print("[OK] Automatically created missing triage tables")
 
 
 class VercelCorsMiddleware(MiddlewareMixin):

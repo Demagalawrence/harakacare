@@ -35,7 +35,7 @@ def test_patient_notification_system():
                 'available_beds': 50,
             }
         )
-        print(f"   ✅ Test facility: {facility.name} ({'created' if created else 'existing'})")
+        print(f"   [OK] Test facility: {facility.name} ({'created' if created else 'existing'})")
         
         # Create test routing
         routing, created = FacilityRouting.objects.get_or_create(
@@ -49,7 +49,7 @@ def test_patient_notification_system():
                 'routing_status': 'pending',
             }
         )
-        print(f"   ✅ Test routing: {routing.patient_token} ({'created' if created else 'existing'})")
+        print(f"   [OK] Test routing: {routing.patient_token} ({'created' if created else 'existing'})")
         
         # Create patient preferences
         preferences, created = PatientNotificationPreference.objects.get_or_create(
@@ -61,10 +61,10 @@ def test_patient_notification_system():
                 'language_preference': 'en',
             }
         )
-        print(f"   ✅ Patient preferences: {preferences.preferred_channel} ({'created' if created else 'existing'})")
+        print(f"   [OK] Patient preferences: {preferences.preferred_channel} ({'created' if created else 'existing'})")
         
     except Exception as e:
-        print(f"   ❌ Test data creation failed: {e}")
+        print(f"   [ERROR] Test data creation failed: {e}")
         return
     
     # Test 2: Test facility confirmation notification
@@ -84,16 +84,16 @@ def test_patient_notification_system():
         )
         
         if notification:
-            print(f"   ✅ Confirmation notification created: {notification.id}")
-            print(f"   📱 Channel: {notification.delivery_channel}")
-            print(f"   📝 Status: {notification.delivery_status}")
-            print(f"   📋 Title: {notification.title}")
+            print(f"   [OK] Confirmation notification created: {notification.id}")
+            print(f"   [CAMERA] Channel: {notification.delivery_channel}")
+            print(f"   [MEMO] Status: {notification.delivery_status}")
+            print(f"   [CLIPBOARD] Title: {notification.title}")
             print(f"   💬 Message preview: {notification.message[:100]}...")
         else:
-            print("   ⚠️  No notification created (patient may have opted out)")
+            print("   WARNING:  No notification created (patient may have opted out)")
             
     except Exception as e:
-        print(f"   ❌ Confirmation notification failed: {e}")
+        print(f"   [ERROR] Confirmation notification failed: {e}")
     
     # Test 3: Test facility rejection notification
     print("\n3. Testing facility rejection notification...")
@@ -116,16 +116,16 @@ def test_patient_notification_system():
         )
         
         if notification:
-            print(f"   ✅ Rejection notification created: {notification.id}")
-            print(f"   📱 Channel: {notification.delivery_channel}")
-            print(f"   📝 Status: {notification.delivery_status}")
-            print(f"   📋 Title: {notification.title}")
+            print(f"   [OK] Rejection notification created: {notification.id}")
+            print(f"   [CAMERA] Channel: {notification.delivery_channel}")
+            print(f"   [MEMO] Status: {notification.delivery_status}")
+            print(f"   [CLIPBOARD] Title: {notification.title}")
             print(f"   💬 Message preview: {notification.message[:100]}...")
         else:
-            print("   ⚠️  No notification created (patient may have opted out)")
+            print("   WARNING:  No notification created (patient may have opted out)")
             
     except Exception as e:
-        print(f"   ❌ Rejection notification failed: {e}")
+        print(f"   [ERROR] Rejection notification failed: {e}")
     
     # Test 4: Test alternative facility notification
     print("\n4. Testing alternative facility notification...")
@@ -137,16 +137,16 @@ def test_patient_notification_system():
         )
         
         if notification:
-            print(f"   ✅ Alternative facility notification created: {notification.id}")
-            print(f"   📱 Channel: {notification.delivery_channel}")
-            print(f"   📝 Status: {notification.delivery_status}")
-            print(f"   📋 Title: {notification.title}")
+            print(f"   [OK] Alternative facility notification created: {notification.id}")
+            print(f"   [CAMERA] Channel: {notification.delivery_channel}")
+            print(f"   [MEMO] Status: {notification.delivery_status}")
+            print(f"   [CLIPBOARD] Title: {notification.title}")
             print(f"   💬 Message preview: {notification.message[:100]}...")
         else:
-            print("   ⚠️  No notification created (patient may have opted out)")
+            print("   WARNING:  No notification created (patient may have opted out)")
             
     except Exception as e:
-        print(f"   ❌ Alternative facility notification failed: {e}")
+        print(f"   [ERROR] Alternative facility notification failed: {e}")
     
     # Test 5: Test bed reservation notification
     print("\n5. Testing bed reservation notification...")
@@ -163,16 +163,16 @@ def test_patient_notification_system():
         )
         
         if notification:
-            print(f"   ✅ Bed reservation notification created: {notification.id}")
-            print(f"   📱 Channel: {notification.delivery_channel}")
-            print(f"   📝 Status: {notification.delivery_status}")
-            print(f"   📋 Title: {notification.title}")
+            print(f"   [OK] Bed reservation notification created: {notification.id}")
+            print(f"   [CAMERA] Channel: {notification.delivery_channel}")
+            print(f"   [MEMO] Status: {notification.delivery_status}")
+            print(f"   [CLIPBOARD] Title: {notification.title}")
             print(f"   💬 Message preview: {notification.message[:100]}...")
         else:
-            print("   ⚠️  No notification created (patient may have opted out)")
+            print("   WARNING:  No notification created (patient may have opted out)")
             
     except Exception as e:
-        print(f"   ❌ Bed reservation notification failed: {e}")
+        print(f"   [ERROR] Bed reservation notification failed: {e}")
     
     # Test 6: Test case update notification
     print("\n6. Testing case update notification...")
@@ -184,16 +184,16 @@ def test_patient_notification_system():
         )
         
         if notification:
-            print(f"   ✅ Case update notification created: {notification.id}")
-            print(f"   📱 Channel: {notification.delivery_channel}")
-            print(f"   📝 Status: {notification.delivery_status}")
-            print(f"   📋 Title: {notification.title}")
+            print(f"   [OK] Case update notification created: {notification.id}")
+            print(f"   [CAMERA] Channel: {notification.delivery_channel}")
+            print(f"   [MEMO] Status: {notification.delivery_status}")
+            print(f"   [CLIPBOARD] Title: {notification.title}")
             print(f"   💬 Message preview: {notification.message[:100]}...")
         else:
-            print("   ⚠️  No notification created (patient may have opted out)")
+            print("   WARNING:  No notification created (patient may have opted out)")
             
     except Exception as e:
-        print(f"   ❌ Case update notification failed: {e}")
+        print(f"   [ERROR] Case update notification failed: {e}")
     
     # Test 7: Check notification preferences
     print("\n7. Testing notification preferences...")
@@ -207,18 +207,18 @@ def test_patient_notification_system():
         print(f"   🕐 Is in quiet hours: {preferences.is_in_quiet_hours()}")
         
         # Test notification type preferences
-        print(f"   📋 Facility updates enabled: {preferences.enable_facility_updates}")
+        print(f"   [CLIPBOARD] Facility updates enabled: {preferences.enable_facility_updates}")
         print(f"   ⏰ Appointment reminders enabled: {preferences.enable_appointment_reminders}")
-        print(f"   📊 Case updates enabled: {preferences.enable_case_updates}")
+        print(f"   [CHART] Case updates enabled: {preferences.enable_case_updates}")
         
         # Test notification type checking
         can_send_facility = preferences.can_send_notification('facility_confirmed')
         can_send_appointment = preferences.can_send_notification('appointment_scheduled')
-        print(f"   ✅ Can send facility confirmation: {can_send_facility}")
-        print(f"   ✅ Can send appointment reminder: {can_send_appointment}")
+        print(f"   [OK] Can send facility confirmation: {can_send_facility}")
+        print(f"   [OK] Can send appointment reminder: {can_send_appointment}")
         
     except Exception as e:
-        print(f"   ❌ Notification preferences test failed: {e}")
+        print(f"   [ERROR] Notification preferences test failed: {e}")
     
     # Test 8: View all created notifications
     print("\n8. Reviewing created notifications...")
@@ -227,27 +227,27 @@ def test_patient_notification_system():
             patient_token='PT-TEST-NOTIFICATION'
         ).order_by('-created_at')
         
-        print(f"   📊 Total notifications created: {notifications.count()}")
+        print(f"   [CHART] Total notifications created: {notifications.count()}")
         
         for notification in notifications:
-            print(f"   📝 {notification.get_notification_type_display()}: {notification.delivery_status}")
-            print(f"       📱 Channel: {notification.delivery_channel}")
+            print(f"   [MEMO] {notification.get_notification_type_display()}: {notification.delivery_status}")
+            print(f"       [CAMERA] Channel: {notification.delivery_channel}")
             print(f"       🕐 Created: {notification.created_at.strftime('%H:%M:%S')}")
             if notification.facility:
                 print(f"       🏥 Facility: {notification.facility.name}")
             print()
         
     except Exception as e:
-        print(f"   ❌ Notification review failed: {e}")
+        print(f"   [ERROR] Notification review failed: {e}")
     
     print("\n🎯 Patient Notification System Test Summary:")
-    print("   ✅ Models: PatientNotification and PatientNotificationPreference working")
-    print("   ✅ Service: PatientNotificationService functional")
-    print("   ✅ Templates: All notification types generating messages")
-    print("   ✅ Preferences: Patient preferences and quiet hours working")
-    print("   ✅ Integration: Ready for facility response integration")
-    print("   📱 Channels: WhatsApp, SMS, Email, USSD support")
-    print("   🔄 Status: System ready for production use!")
+    print("   [OK] Models: PatientNotification and PatientNotificationPreference working")
+    print("   [OK] Service: PatientNotificationService functional")
+    print("   [OK] Templates: All notification types generating messages")
+    print("   [OK] Preferences: Patient preferences and quiet hours working")
+    print("   [OK] Integration: Ready for facility response integration")
+    print("   [CAMERA] Channels: WhatsApp, SMS, Email, USSD support")
+    print("   [BUG] Status: System ready for production use!")
 
 
 if __name__ == '__main__':

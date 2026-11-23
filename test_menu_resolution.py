@@ -14,11 +14,11 @@ from apps.triage.tools.conversational_intake_agent import STRUCTURED_MENUS, Menu
 
 def test_menu_resolution():
     """Test menu resolution without Django setup"""
-    print("🧪 TESTING MENU RESOLUTION")
+    print("[TEST_TUBE] TESTING MENU RESOLUTION")
     print("=" * 50)
     
     # Test age_sex_gate menu
-    print("\n📝 AGE/SEX GATE TESTS:")
+    print("\n[MEMO] AGE/SEX GATE TESTS:")
     age_menu = STRUCTURED_MENUS["age_sex_gate"]
     
     test_cases = [
@@ -38,11 +38,11 @@ def test_menu_resolution():
         
         if matched:
             if result == expected:
-                print(f"  ✅ CORRECT: {result}")
+                print(f"  [OK] CORRECT: {result}")
             else:
-                print(f"  ❌ INCORRECT: Expected {expected}, got {result}")
+                print(f"  [ERROR] INCORRECT: Expected {expected}, got {result}")
         else:
-            print(f"  ❌ NOT RESOLVED: Input '{input_val}' not recognized")
+            print(f"  [ERROR] NOT RESOLVED: Input '{input_val}' not recognized")
     
     # Test pregnancy_status menu
     print("\n🤰 PREGNANCY STATUS TESTS:")
@@ -64,14 +64,14 @@ def test_menu_resolution():
         
         if matched:
             if result == expected:
-                print(f"  ✅ CORRECT: {result}")
+                print(f"  [OK] CORRECT: {result}")
             else:
-                print(f"  ❌ INCORRECT: Expected {expected}, got {result}")
+                print(f"  [ERROR] INCORRECT: Expected {expected}, got {result}")
         else:
-            print(f"  ❌ NOT RESOLVED: Input '{input_val}' not recognized")
+            print(f"  [ERROR] NOT RESOLVED: Input '{input_val}' not recognized")
     
     # Test other menus
-    print("\n📋 OTHER MENU TESTS:")
+    print("\n[CLIPBOARD] OTHER MENU TESTS:")
     other_menus = ["severity", "duration", "progression_status", "allergies", "on_medication", "consents"]
     
     for menu_name in other_menus:
@@ -82,7 +82,7 @@ def test_menu_resolution():
             # Test first 3 options
             for i, (key, expected) in enumerate(list(menu["options"].items())[:3]):
                 matched, result = MenuResolver.resolve(menu_name, key)
-                status = "✅" if matched and result == expected else "❌" if not matched else "⚠️"
+                status = "[OK]" if matched and result == expected else "[ERROR]" if not matched else "WARNING:"
                 print(f"    {key}: {result} {status}")
     
     print("\n" + "=" * 50)

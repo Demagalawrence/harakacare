@@ -28,10 +28,10 @@ def add_user_to_facility():
     # Show available facilities
     facilities = Facility.objects.all()
     if not facilities:
-        print("❌ No facilities found. Please create facilities first.")
+        print("[ERROR] No facilities found. Please create facilities first.")
         return
     
-    print("\n📋 Available Facilities:")
+    print("\n[CLIPBOARD] Available Facilities:")
     for i, facility in enumerate(facilities, 1):
         print(f"   {i}. {facility.name} ({facility.facility_type})")
     
@@ -39,27 +39,27 @@ def add_user_to_facility():
     try:
         facility_choice = int(input("\n🏥 Select facility (number): ")) - 1
         if facility_choice < 0 or facility_choice >= len(facilities):
-            print("❌ Invalid facility choice")
+            print("[ERROR] Invalid facility choice")
             return
         facility = facilities[facility_choice]
     except ValueError:
-        print("❌ Please enter a valid number")
+        print("[ERROR] Please enter a valid number")
         return
     
     # Get user details
-    username = input("👤 Username: ").strip()
+    username = input("[USER] Username: ").strip()
     if not username:
-        print("❌ Username is required")
+        print("[ERROR] Username is required")
         return
     
-    email = input("📧 Email: ").strip()
-    first_name = input("📝 First name: ").strip()
-    last_name = input("📝 Last name: ").strip()
-    password = input("🔒 Password: ").strip()
+    email = input("[EMAIL] Email: ").strip()
+    first_name = input("[MEMO] First name: ").strip()
+    last_name = input("[MEMO] Last name: ").strip()
+    password = input("[LOCK] Password: ").strip()
     
     if not password:
         password = "password123"  # Default password
-        print(f"⚠️  Using default password: {password}")
+        print(f"WARNING:  Using default password: {password}")
     
     # Get role
     roles = UserProfile.UserRole.choices
@@ -70,16 +70,16 @@ def add_user_to_facility():
     try:
         role_choice = int(input("👥 Select role (number): ")) - 1
         if role_choice < 0 or role_choice >= len(roles):
-            print("❌ Invalid role choice")
+            print("[ERROR] Invalid role choice")
             return
         role = roles[role_choice][0]
     except ValueError:
-        print("❌ Please enter a valid number")
+        print("[ERROR] Please enter a valid number")
         return
     
     department = input("🏢 Department (optional): ").strip()
-    phone = input("📱 Phone (optional): ").strip()
-    license_num = input("📋 License number (optional): ").strip()
+    phone = input("[CAMERA] Phone (optional): ").strip()
+    license_num = input("[CLIPBOARD] License number (optional): ").strip()
     
     # Create user
     try:
@@ -96,9 +96,9 @@ def add_user_to_facility():
         if created:
             user.set_password(password)
             user.save()
-            print(f"✅ Created user: {user.get_full_name()}")
+            print(f"[OK] Created user: {user.get_full_name()}")
         else:
-            print(f"📝 User already exists: {user.get_full_name()}")
+            print(f"[MEMO] User already exists: {user.get_full_name()}")
         
         # Create user profile
         profile, created = UserProfile.objects.get_or_create(
@@ -115,7 +115,7 @@ def add_user_to_facility():
         )
         
         if created:
-            print(f"✅ Created profile and assigned to {facility.name}")
+            print(f"[OK] Created profile and assigned to {facility.name}")
         else:
             profile.facility = facility
             profile.role = role
@@ -123,14 +123,14 @@ def add_user_to_facility():
             profile.phone_number = phone or None
             profile.license_number = license_num or None
             profile.save()
-            print(f"✅ Updated profile and assigned to {facility.name}")
+            print(f"[OK] Updated profile and assigned to {facility.name}")
         
         print(f"\n🎉 Success! User can now login and access {facility.name}")
-        print(f"🔐 Login: {username} / {password}")
+        print(f"[LOCK] Login: {username} / {password}")
         print(f"🌐 Admin URL: http://127.0.0.1:8000/harakacare-admin/")
         
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"[ERROR] Error: {e}")
 
 if __name__ == '__main__':
     add_user_to_facility()

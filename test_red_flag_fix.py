@@ -2,7 +2,7 @@
 import re
 
 def test_red_flag_detection():
-    print("🔍 TESTING RED FLAG DETECTION FIX")
+    print("[SEARCH] TESTING RED FLAG DETECTION FIX")
     print("="*50)
     
     # Test cases
@@ -20,7 +20,7 @@ def test_red_flag_detection():
     all_passed = True
     for text, expected, description in test_cases:
         result = bool(re.search(pattern, text.lower()))
-        status = "✅ PASS" if result == expected else "❌ FAIL"
+        status = "[OK] PASS" if result == expected else "[ERROR] FAIL"
         if result != expected:
             all_passed = False
         
@@ -33,7 +33,7 @@ def test_red_flag_detection():
     if all_passed:
         print("🎉 ALL TESTS PASSED! Red flag detection is now correct.")
     else:
-        print("⚠️  Some tests failed. Check the pattern.")
+        print("WARNING:  Some tests failed. Check the pattern.")
     
     return all_passed
 

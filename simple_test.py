@@ -25,7 +25,7 @@ def test_distance_scoring():
         score = calculate_distance_score(dist)
         print(f"   {dist}km -> Score: {score}")
     
-    print("✅ Distance scoring works!\n")
+    print("[OK] Distance scoring works!\n")
 
 def test_booking_logic():
     """Test hybrid booking logic"""
@@ -55,11 +55,11 @@ def test_booking_logic():
         booking_type = determine_booking_type(risk, red_flags, symptom)
         print(f"   Risk: {risk}, Red Flags: {red_flags}, Symptom: {symptom} -> {booking_type}")
     
-    print("✅ Booking logic works!\n")
+    print("[OK] Booking logic works!\n")
 
 def test_priority_scoring():
     """Test priority scoring"""
-    print("🚀 Testing Priority Scoring...")
+    print("[ROCKET] Testing Priority Scoring...")
     
     def calculate_priority_score(risk_level, has_red_flags):
         score = 0.0
@@ -89,7 +89,7 @@ def test_priority_scoring():
         score = calculate_priority_score(risk, red_flags)
         print(f"   Risk: {risk}, Red Flags: {red_flags} -> Score: {score}")
     
-    print("✅ Priority scoring works!\n")
+    print("[OK] Priority scoring works!\n")
 
 def test_service_matching():
     """Test service matching logic"""
@@ -129,11 +129,11 @@ def test_service_matching():
         required_services = get_required_services(symptom, conditions)
         print(f"   Symptom: {symptom}, Conditions: {conditions} -> Services: {required_services}")
     
-    print("✅ Service matching works!\n")
+    print("[OK] Service matching works!\n")
 
 def main():
     """Run all simple tests"""
-    print("🚀 HarakaCare Facility Agent - Simple Logic Tests")
+    print("[ROCKET] HarakaCare Facility Agent - Simple Logic Tests")
     print("=" * 50)
     
     test_distance_scoring()
@@ -143,13 +143,13 @@ def main():
     
     print("=" * 50)
     print("🎉 All core logic tests passed!")
-    print("\n📋 Implementation Summary:")
-    print("   ✅ Distance-based facility scoring")
-    print("   ✅ Hybrid booking (auto/manual)")
-    print("   ✅ Priority-based case handling")
-    print("   ✅ Symptom-to-service mapping")
-    print("   ✅ Emergency case prioritization")
-    print("\n🔧 Ready for integration!")
+    print("\n[CLIPBOARD] Implementation Summary:")
+    print("   [OK] Distance-based facility scoring")
+    print("   [OK] Hybrid booking (auto/manual)")
+    print("   [OK] Priority-based case handling")
+    print("   [OK] Symptom-to-service mapping")
+    print("   [OK] Emergency case prioritization")
+    print("\n[GUN] Ready for integration!")
 
 if __name__ == "__main__":
     main()

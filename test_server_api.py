@@ -10,18 +10,18 @@ BASE_URL = "http://127.0.0.1:8000"
 
 def test_admin_panel():
     """Test that Django admin is accessible"""
-    print("🔧 Testing Django Admin Panel...")
+    print("[GUN] Testing Django Admin Panel...")
     
     try:
         response = requests.get(f"{BASE_URL}/admin/", timeout=5)
         if response.status_code == 200:
-            print("   ✅ Admin panel accessible")
+            print("   [OK] Admin panel accessible")
             return True
         else:
-            print(f"   ❌ Admin panel returned {response.status_code}")
+            print(f"   [ERROR] Admin panel returned {response.status_code}")
             return False
     except Exception as e:
-        print(f"   ❌ Admin panel error: {str(e)}")
+        print(f"   [ERROR] Admin panel error: {str(e)}")
         return False
 
 def test_facility_api():
@@ -35,13 +35,13 @@ def test_facility_api():
         
         if response.status_code == 200:
             data = response.json()
-            print(f"   ✅ Facilities API working - Found {len(data)} facilities")
+            print(f"   [OK] Facilities API working - Found {len(data)} facilities")
             return True
         else:
-            print(f"   ❌ Facilities API failed: {response.text}")
+            print(f"   [ERROR] Facilities API failed: {response.text}")
             return False
     except Exception as e:
-        print(f"   ❌ Facilities API error: {str(e)}")
+        print(f"   [ERROR] Facilities API error: {str(e)}")
         return False
 
 def test_triage_api():
@@ -54,18 +54,18 @@ def test_triage_api():
         print(f"   Triage API Status: {response.status_code}")
         
         if response.status_code == 200:
-            print("   ✅ Triage API accessible")
+            print("   [OK] Triage API accessible")
             return True
         else:
-            print(f"   ❌ Triage API failed: {response.text}")
+            print(f"   [ERROR] Triage API failed: {response.text}")
             return False
     except Exception as e:
-        print(f"   ❌ Triage API error: {str(e)}")
+        print(f"   [ERROR] Triage API error: {str(e)}")
         return False
 
 def test_facility_agent_simulation():
     """Simulate Facility Agent workflow"""
-    print("\n🚀 Testing Facility Agent Workflow Simulation...")
+    print("\n[ROCKET] Testing Facility Agent Workflow Simulation...")
     
     # Simulate triage data
     triage_data = {
@@ -104,7 +104,7 @@ def test_facility_agent_simulation():
         }
     ]
     
-    print(f"\n   🔍 Matching facilities...")
+    print(f"\n   [SEARCH] Matching facilities...")
     for i, facility in enumerate(facilities, 1):
         # Calculate match score
         distance_score = 1.0 if facility["distance_km"] <= 5 else 0.8 if facility["distance_km"] <= 10 else 0.4
@@ -128,7 +128,7 @@ def test_facility_agent_simulation():
 
 def main():
     """Run all API tests"""
-    print("🚀 HarakaCare Facility Agent - Server API Tests")
+    print("[ROCKET] HarakaCare Facility Agent - Server API Tests")
     print("=" * 60)
     
     tests = [
@@ -148,21 +148,21 @@ def main():
             else:
                 failed += 1
         except Exception as e:
-            print(f"   ❌ Test error: {str(e)}")
+            print(f"   [ERROR] Test error: {str(e)}")
             failed += 1
     
     print("\n" + "=" * 60)
     print(f"🎯 API Test Results:")
-    print(f"   ✅ Passed: {passed}")
-    print(f"   ❌ Failed: {failed}")
-    print(f"   📊 Success Rate: {(passed/(passed+failed)*100):.1f}%")
+    print(f"   [OK] Passed: {passed}")
+    print(f"   [ERROR] Failed: {failed}")
+    print(f"   [CHART] Success Rate: {(passed/(passed+failed)*100):.1f}%")
     
     if failed == 0:
         print("\n🎉 All API tests passed!")
-        print("🔧 HarakaCare server is running successfully!")
-        print("📱 Facility Agent APIs are accessible!")
+        print("[GUN] HarakaCare server is running successfully!")
+        print("[CAMERA] Facility Agent APIs are accessible!")
     else:
-        print(f"\n⚠️  {failed} test(s) failed - check server configuration")
+        print(f"\nWARNING:  {failed} test(s) failed - check server configuration")
     
     return failed == 0
 

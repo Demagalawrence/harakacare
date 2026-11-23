@@ -250,15 +250,15 @@ class WhatsAppHandler:
                     
                     # Send booking confirmation with REAL data
                     booking_message = (
-                        f"✅ *Booking Confirmed*\n\n"
+                        f"[OK] *Booking Confirmed*\n\n"
                         f"🏥 *Facility:* {facility_name}\n"
                         f"📅 *Date:* {appointment_date}\n"
                         f"🕐 *Time:* {appointment_time}\n\n"
                         f"📍 *Please arrive 15 minutes before your appointment.*\n\n"
-                        f"📞 *Facility Contact:* {facility_phone}\n"
+                        f"[SPEAKER] *Facility Contact:* {facility_phone}\n"
                         f"📍 *Address:* {facility_address}\n\n"
-                        f"📞 *Need to reschedule?* Reply 'reschedule' or call facility directly.\n\n"
-                        f"🔑 *Reference:* {_patient_token(phone)}\n\n"
+                        f"[SPEAKER] *Need to reschedule?* Reply 'reschedule' or call facility directly.\n\n"
+                        f"[UNLOCK] *Reference:* {_patient_token(phone)}\n\n"
                         f"_⚕️ Bring your ID and any relevant medical records._"
                     )
                     
@@ -269,7 +269,7 @@ class WhatsAppHandler:
                 except Exception as e:
                     logger.error(f"Failed to get facility data for booking: {e}")
                     # Emergency fallback
-                    self._send(phone, f"✅ Booking confirmed! Reference: {_patient_token(phone)}")
+                    self._send(phone, f"[OK] Booking confirmed! Reference: {_patient_token(phone)}")
             
             _clear_session(phone)
 
@@ -317,7 +317,7 @@ class WhatsAppHandler:
         if error:
             self._send(
                 phone,
-                f"✅ *Assessment received*\n\n"
+                f"[OK] *Assessment received*\n\n"
                 f"Reference: *{token}*\n\n"
                 f"We were unable to complete the automated assessment. "
                 f"Please visit a health facility for evaluation.\n\n"
@@ -325,7 +325,7 @@ class WhatsAppHandler:
             )
         else:
             parts = [
-                "✅ *HarakaCare Assessment Complete*\n",
+                "[OK] *HarakaCare Assessment Complete*\n",
                 f"{emoji} *Risk Level: {risk}*",
                 f"Priority: {priority}",
             ]
@@ -336,11 +336,11 @@ class WhatsAppHandler:
             if pregnancy_note:
                 parts.append(pregnancy_note)
             if action:
-                parts.append(f"\n📋 *Advice:*\n{action}")
+                parts.append(f"\n[CLIPBOARD] *Advice:*\n{action}")
             if turns:
                 parts.append(f"\n_Completed in {turns} messages._")
             parts += [
-                "\n🔑 *Your reference token:*",
+                "\n[UNLOCK] *Your reference token:*",
                 f"*{token}*",
                 "_Save this. Type 'status' to retrieve your result later._",
                 "\n_⚕️ Not a medical diagnosis. Always consult a qualified health worker._",
@@ -368,7 +368,7 @@ class WhatsAppHandler:
     def _send_emergency_alert(self, phone: str, flags: Dict[str, Any]) -> None:
         flag_names = [k.replace("_", " ").title() for k, v in flags.items() if v]
         flags_text = (
-            "\n".join(f"⚠️ {f}" for f in flag_names) + "\n\n"
+            "\n".join(f"WARNING: {f}" for f in flag_names) + "\n\n"
         ) if flag_names else ""
 
         self._send(
@@ -387,7 +387,7 @@ class WhatsAppHandler:
         _clear_session(phone)
         self._send(
             phone,
-            "🔄 *Session reset.*\n\n"
+            "[BUG] *Session reset.*\n\n"
             "Welcome to *HarakaCare* 🏥\n\n"
             "Describe your health concern or symptoms in your own words "
             "and I will help assess them."
@@ -403,7 +403,7 @@ class WhatsAppHandler:
             if session.session_status != TriageSession.SessionStatus.COMPLETED:
                 self._send(
                     phone,
-                    f"⏳ Your assessment (*{token}*) is still in progress.\n"
+                    f"[CLOCK] Your assessment (*{token}*) is still in progress.\n"
                     "Please complete the questions to receive your result."
                 )
                 return
@@ -421,10 +421,10 @@ class WhatsAppHandler:
 
             self._send(
                 phone,
-                f"📋 *Your HarakaCare Result*\n\n"
+                f"[CLIPBOARD] *Your HarakaCare Result*\n\n"
                 f"{emoji} Risk: *{risk}* | Priority: {priority}\n"
                 f"Facility: {facility}\n\n"
-                f"📋 Advice:\n{action}\n\n"
+                f"[CLIPBOARD] Advice:\n{action}\n\n"
                 f"Assessed: {completed}\n"
                 f"Reference: *{token}*\n\n"
                 f"_Type 'reset' to start a new assessment._"
@@ -519,7 +519,7 @@ class WhatsAppHandler:
         elif "reschedule" in text_lower:
             self._send(
                 phone,
-                "📞 *To reschedule:*\n\n"
+                "[SPEAKER] *To reschedule:*\n\n"
                 "Please call the facility directly:\n"
                 "• HarakaCare Health Centre: +256 123 456 789\n"
                 "• Emergency: +256 999 000 111\n\n"
@@ -540,12 +540,12 @@ class WhatsAppHandler:
         """Send booking confirmation message to patient."""
         logger.info(f"Preparing booking confirmation for {phone}: {facility_name}, {appointment_date}, {appointment_time}")
         parts = [
-            f"✅ *Booking Confirmed*\n\n",
+            f"[OK] *Booking Confirmed*\n\n",
             f"🏥 *Facility:* {facility_name}\n",
             f"📅 *Date:* {appointment_date}\n",
             f"🕐 *Time:* {appointment_time}\n\n",
             "📍 *Please arrive 15 minutes before your appointment.*\n\n",
-            "📞 *Need to reschedule?* Reply 'reschedule' or call the facility directly.\n\n",
+            "[SPEAKER] *Need to reschedule?* Reply 'reschedule' or call the facility directly.\n\n",
             f"_Reference: {_patient_token(phone)}_",
             "\n_⚕️ Bring your ID and any relevant medical records._"
         ]
@@ -561,7 +561,7 @@ class WhatsAppHandler:
             f"📅 *Date:* {appointment_date}\n",
             f"🕐 *Time:* {appointment_time}\n\n",
             "📍 *Your appointment is coming up soon!*\n\n",
-            "📞 *Need to reschedule?* Reply 'reschedule'\n\n",
+            "[SPEAKER] *Need to reschedule?* Reply 'reschedule'\n\n",
             f"_Reference: {_patient_token(phone)}_"
         ]
         self._send(phone, "\n".join(parts))

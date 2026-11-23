@@ -8,7 +8,7 @@ from datetime import datetime
 
 def test_low_risk_scenario():
     """Test low-risk patient with manual booking"""
-    print("🔍 Testing Low-Risk Scenario...")
+    print("[SEARCH] Testing Low-Risk Scenario...")
     
     triage_data = {
         "patient_token": "patient_low_123",
@@ -35,7 +35,7 @@ def test_low_risk_scenario():
     print(f"   Expected: Manual confirmation required")
     
     assert booking_type == "manual", "Low-risk case should require manual booking"
-    print("   ✅ Low-risk scenario test passed!")
+    print("   [OK] Low-risk scenario test passed!")
     return True
 
 
@@ -79,7 +79,7 @@ def test_no_facilities_available():
     print(f"   Expected: 0 facilities available")
     
     assert len(emergency_capable) == 0, "Should find no suitable facilities"
-    print("   ✅ No facilities scenario test passed!")
+    print("   [OK] No facilities scenario test passed!")
     return True
 
 
@@ -116,7 +116,7 @@ def test_distance_edge_cases():
         print(f"   {description}: {distance}km -> {score}")
         assert abs(score - expected_score) < 0.01, f"Score mismatch for {distance}km"
     
-    print("   ✅ Distance edge cases test passed!")
+    print("   [OK] Distance edge cases test passed!")
     return True
 
 
@@ -156,13 +156,13 @@ def test_service_mapping_edge_cases():
         print(f"   Symptom: '{symptom}' -> {services}")
         assert services == expected, f"Service mapping failed for '{symptom}'"
     
-    print("   ✅ Service mapping edge cases test passed!")
+    print("   [OK] Service mapping edge cases test passed!")
     return True
 
 
 def test_priority_calculation_edge_cases():
     """Test edge cases for priority calculation"""
-    print("\n🚀 Testing Priority Calculation Edge Cases...")
+    print("\n[ROCKET] Testing Priority Calculation Edge Cases...")
     
     def calculate_priority_score(risk_level, has_red_flags):
         score = 0.0
@@ -191,7 +191,7 @@ def test_priority_calculation_edge_cases():
         print(f"   Risk: {risk}, Red Flags: {red_flags} -> {score}")
         assert score == expected, f"Priority score mismatch for {risk}/{red_flags}"
     
-    print("   ✅ Priority calculation edge cases test passed!")
+    print("   [OK] Priority calculation edge cases test passed!")
     return True
 
 
@@ -257,13 +257,13 @@ def test_notification_payload_validation():
     print(f"   Urgency: {payload['case']['urgency']}")
     print(f"   Expected response: {payload['response_required']['expected_response_time']}")
     
-    print("   ✅ Notification payload validation test passed!")
+    print("   [OK] Notification payload validation test passed!")
     return True
 
 
 def main():
     """Run all edge case tests"""
-    print("🚀 HarakaCare Facility Agent - Edge Case Tests")
+    print("[ROCKET] HarakaCare Facility Agent - Edge Case Tests")
     print("=" * 60)
     
     tests = [
@@ -283,20 +283,20 @@ def main():
             test()
             passed += 1
         except Exception as e:
-            print(f"   ❌ Test failed: {str(e)}")
+            print(f"   [ERROR] Test failed: {str(e)}")
             failed += 1
     
     print("\n" + "=" * 60)
     print(f"🎯 Edge Case Test Results:")
-    print(f"   ✅ Passed: {passed}")
-    print(f"   ❌ Failed: {failed}")
-    print(f"   📊 Success Rate: {(passed/(passed+failed)*100):.1f}%")
+    print(f"   [OK] Passed: {passed}")
+    print(f"   [ERROR] Failed: {failed}")
+    print(f"   [CHART] Success Rate: {(passed/(passed+failed)*100):.1f}%")
     
     if failed == 0:
         print("\n🎉 All edge case tests passed!")
-        print("🔧 Facility Agent is robust and ready for production!")
+        print("[GUN] Facility Agent is robust and ready for production!")
     else:
-        print(f"\n⚠️  {failed} test(s) failed - review needed")
+        print(f"\nWARNING:  {failed} test(s) failed - review needed")
     
     return failed == 0
 

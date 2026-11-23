@@ -104,13 +104,13 @@ class DecisionSynthesisTool:
         # Age-specific action notes
         # ====================================================================
         self.AGE_SPECIFIC_NOTES = {
-            'newborn': "⚠️ NEWBORN: Any illness in first 2 months requires urgent pediatric evaluation.",
-            'infant': "⚠️ INFANT: Infants deteriorate quickly - seek care if concerned.",
+            'newborn': "WARNING: NEWBORN: Any illness in first 2 months requires urgent pediatric evaluation.",
+            'infant': "WARNING: INFANT: Infants deteriorate quickly - seek care if concerned.",
             'child_1_5': "👶 CHILD: Young children need careful monitoring and low threshold for seeking care.",
             'child_6_12': "🧒 CHILD: Monitor closely and seek care if symptoms persist.",
-            'teen': "👤 TEEN: Standard monitoring applies.",
-            'adult': "👤 ADULT: Standard monitoring applies.",
-            'elderly': "⚠️ ELDERLY: Older adults are at higher risk - seek care early."
+            'teen': "[USER] TEEN: Standard monitoring applies.",
+            'adult': "[USER] ADULT: Standard monitoring applies.",
+            'elderly': "WARNING: ELDERLY: Older adults are at higher risk - seek care early."
         }
 
     def synthesize(
@@ -371,7 +371,7 @@ class DecisionSynthesisTool:
         if red_flag_result.get('has_red_flags'):
             flags = red_flag_result.get('detected_flags', [])
             if flags:
-                action = f"⚠️ DANGER SIGNS DETECTED: {', '.join(flags)}\n\n{action}"
+                action = f"WARNING: DANGER SIGNS DETECTED: {', '.join(flags)}\n\n{action}"
         
         # Add age-specific note
         age_note = self.AGE_SPECIFIC_NOTES.get(age_group, "")
@@ -457,7 +457,7 @@ class DecisionSynthesisTool:
                 flags_readable.append(f"{len(flags)-3} more")
             
             parts.append(
-                f"⚠️ EMERGENCY DANGER SIGNS: {', '.join(flags_readable)}. "
+                f"WARNING: EMERGENCY DANGER SIGNS: {', '.join(flags_readable)}. "
                 "This requires immediate medical attention regardless of other factors."
             )
         
@@ -494,8 +494,8 @@ class DecisionSynthesisTool:
         
         # Base disclaimers always shown
         disclaimers = [
-            "⚠️ This is NOT a medical diagnosis - it is a preliminary assessment only.",
-            "📋 This assessment is based on the information you provided.",
+            "WARNING: This is NOT a medical diagnosis - it is a preliminary assessment only.",
+            "[CLIPBOARD] This assessment is based on the information you provided.",
             "🆘 Seek immediate medical care if your condition worsens at any time.",
         ]
         
@@ -519,7 +519,7 @@ class DecisionSynthesisTool:
         # Age-specific disclaimer
         if age_group in ['newborn', 'infant', 'elderly']:
             disclaimers.append(
-                f"👤 Age consideration: {self.AGE_SPECIFIC_NOTES.get(age_group, '')}"
+                f"[USER] Age consideration: {self.AGE_SPECIFIC_NOTES.get(age_group, '')}"
             )
         
         # General disclaimer

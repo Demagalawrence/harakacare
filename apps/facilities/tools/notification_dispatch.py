@@ -245,7 +245,7 @@ Urgency: {urgency}
             base_info += f"Secondary Symptoms: {', '.join(routing.secondary_symptoms)}\n"
 
         if routing.has_red_flags:
-            base_info += "⚠️ RED FLAGS DETECTED\n"
+            base_info += "WARNING: RED FLAGS DETECTED\n"
 
         messages = {
             'new_case': f"""New patient case assigned to your facility.

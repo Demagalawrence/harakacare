@@ -366,15 +366,15 @@ class FacilityAgentOrchestrator:
                 # Send booking confirmation via WhatsApp
                 whatsapp_handler = WhatsAppHandler()
                 booking_message = (
-                    f"✅ *Booking Confirmed*\n\n"
+                    f"[OK] *Booking Confirmed*\n\n"
                     f"🏥 *Facility:* {facility.name}\n"
                     f"📅 *Date:* {appointment_date}\n"
                     f"🕐 *Time:* {appointment_time}\n\n"
                     f"📍 *Please arrive 15 minutes before your appointment.*\n\n"
-                    f"📞 *Facility Contact:* {facility.phone_number}\n"
+                    f"[SPEAKER] *Facility Contact:* {facility.phone_number}\n"
                     f"📍 *Address:* {facility.address}\n\n"
-                    f"📞 *Need to reschedule?* Reply 'reschedule' or call facility directly.\n\n"
-                    f"🔑 *Reference:* {routing.patient_token}\n\n"
+                    f"[SPEAKER] *Need to reschedule?* Reply 'reschedule' or call facility directly.\n\n"
+                    f"[UNLOCK] *Reference:* {routing.patient_token}\n\n"
                     f"_⚕️ Bring your ID and any relevant medical records._"
                 )
                 whatsapp_handler._send(phone, booking_message)

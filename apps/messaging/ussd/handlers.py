@@ -479,7 +479,7 @@ class USSDHandler:
         facility = final_decision.get("facility_type") or ""
         has_red_flags = red_flag_result.get("has_red_flags", False)
 
-        emergency_line = "⚠️ DANGER SIGNS DETECTED\n" if has_red_flags else ""
+        emergency_line = "WARNING: DANGER SIGNS DETECTED\n" if has_red_flags else ""
 
         return (
             f"HarakaCare Result\n"

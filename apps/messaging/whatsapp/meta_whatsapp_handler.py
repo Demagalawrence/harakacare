@@ -260,7 +260,7 @@ class MetaWhatsAppHandler:
             if session.forwarded_to_facility:
                 return {
                     "type": "text", 
-                    "message": "✅ Your case has been sent to a healthcare facility."
+                    "message": "[OK] Your case has been sent to a healthcare facility."
                 }
 
             risk = session.risk_level or "unknown"
@@ -268,7 +268,7 @@ class MetaWhatsAppHandler:
             
             return {
                 "type": "text",
-                "message": f"📋 Your assessment: {risk.title()} risk, {priority} priority."
+                "message": f"[CLIPBOARD] Your assessment: {risk.title()} risk, {priority} priority."
             }
 
         except Exception as e:
@@ -279,7 +279,7 @@ class MetaWhatsAppHandler:
         return {
             "type": "text",
             "message": (
-                "🤖 HarakaCare Commands:\n\n"
+                "[HUG] HarakaCare Commands:\n\n"
                 "• Describe your symptom to start assessment\n"
                 "• 'status' - Check your assessment result\n"
                 "• 'reset' - Start new assessment\n"
@@ -299,7 +299,7 @@ class MetaWhatsAppHandler:
             if triage_result.get("error"):
                 return {
                     "type": "text",
-                    "message": "⚠️ Assessment error. Please try again or contact support."
+                    "message": "WARNING: Assessment error. Please try again or contact support."
                 }
 
             risk_level = triage_result.get("risk_level", "unknown")
@@ -311,10 +311,10 @@ class MetaWhatsAppHandler:
                 urgency = "🚨 HIGH RISK"
                 action = "Go to hospital IMMEDIATELY"
             elif risk_level == "medium":
-                urgency = "⚠️ MEDIUM RISK"
+                urgency = "WARNING: MEDIUM RISK"
                 action = "Visit clinic today"
             else:
-                urgency = "✅ LOW RISK"
+                urgency = "[OK] LOW RISK"
                 action = "Monitor at home, seek care if worsening"
 
             message = (

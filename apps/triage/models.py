@@ -567,7 +567,7 @@ class TriageSession(StatusModel):
 
         if self.has_red_flags:
             red_flag_names = [k.replace('_', ' ').title() for k, v in self.red_flag_indicators.items() if v]
-            summary_parts.append(f"⚠️ RED FLAGS: {', '.join(red_flag_names)}")
+            summary_parts.append(f"WARNING: RED FLAGS: {', '.join(red_flag_names)}")
 
         return " | ".join(summary_parts)
 

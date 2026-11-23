@@ -42,6 +42,11 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# Phase 3: OpenAI Conversational Triage
+from apps.triage.openai_chat import chat_ai
+from apps.triage.clinical_safety_engine import safety_engine, SafetyLevel
+from apps.triage.chat_assessment_service import chat_assessment_service
+
 
 class StartTriageView(views.APIView):
     """
@@ -328,7 +333,7 @@ class SubmitTriageView(views.APIView):
         """
 
         print("\n" + "="*70)
-        print(f"🚀 TRIAGE SUBMISSION - Token: {patient_token}")
+        print(f"[ROCKET] TRIAGE SUBMISSION - Token: {patient_token}")
         print("="*70)
 
         try:
@@ -337,7 +342,7 @@ class SubmitTriageView(views.APIView):
             # ------------------------------------------------------------
             serializer = TriageIntakeSerializer(data=request.data)
             if not serializer.is_valid():
-                print("❌ Validation failed:", serializer.errors)
+                print("[ERROR] Validation failed:", serializer.errors)
                 return Response({
                     'error': 'Invalid triage data',
                     'errors': serializer.errors
@@ -352,13 +357,13 @@ class SubmitTriageView(views.APIView):
             is_valid, cleaned_data, errors = intake_tool.validate(validated_data)
 
             if not is_valid:
-                print("❌ Intake validation failed:", errors)
+                print("[ERROR] Intake validation failed:", errors)
                 return Response({
                     'error': 'Clinical validation failed',
                     'errors': errors
                 }, status=status.HTTP_400_BAD_REQUEST)
 
-            print("✅ Intake validation passed")
+            print("[OK] Intake validation passed")
             print("Cleaned data:", cleaned_data)
 
             # ------------------------------------------------------------
@@ -370,7 +375,7 @@ class SubmitTriageView(views.APIView):
                     cleaned_data
                 )
 
-            print("✅ Orchestrator completed")
+            print("[OK] Orchestrator completed")
             print("Risk:", final_decision['risk_level'])
 
             # ------------------------------------------------------------
@@ -399,7 +404,7 @@ class SubmitTriageView(views.APIView):
             }
 
             print("="*70)
-            print("✅ TRIAGE COMPLETED SUCCESSFULLY")
+            print("[OK] TRIAGE COMPLETED SUCCESSFULLY")
             print("="*70 + "\n")
 
             return Response(response_data, status=status.HTTP_200_OK)
@@ -421,10 +426,10 @@ class SubmitTriageView(views.APIView):
             return ""
         
         if len(detected_flags) == 1:
-            return f"⚠️ EMERGENCY: {detected_flags[0]} detected. Seek immediate care!"
+            return f"WARNING: EMERGENCY: {detected_flags[0]} detected. Seek immediate care!"
         else:
             flags_list = ", ".join(detected_flags[:-1]) + " and " + detected_flags[-1]
-            return f"⚠️ EMERGENCY: Multiple danger signs detected: {flags_list}. Seek immediate care!"
+            return f"WARNING: EMERGENCY: Multiple danger signs detected: {flags_list}. Seek immediate care!"
 
 
 class TriageResultView(views.APIView):
@@ -503,10 +508,10 @@ class TriageResultView(views.APIView):
             return ""
         
         if len(detected_flags) == 1:
-            return f"⚠️ EMERGENCY: {detected_flags[0]} detected. Seek immediate care!"
+            return f"WARNING: EMERGENCY: {detected_flags[0]} detected. Seek immediate care!"
         else:
             flags_list = ", ".join(detected_flags[:-1]) + " and " + detected_flags[-1]
-            return f"⚠️ EMERGENCY: Multiple danger signs detected: {flags_list}. Seek immediate care!"
+            return f"WARNING: EMERGENCY: Multiple danger signs detected: {flags_list}. Seek immediate care!"
 
 
 class TriageStatusView(views.APIView):
@@ -807,3 +812,34 @@ class TriageOptionsView(views.APIView):
         }
         
         return Response(options, status=status.HTTP_200_OK)
+
+class ChatTriageView(views.APIView):
+    """
+    POST /api/v1/triage/chat/
+    Intelligent conversational triage (Ada Health-inspired adaptive assessment).
+
+    Delegates to ChatAssessmentService, which runs a deterministic, clinician-reviewed
+    adaptive state machine over existing HarakaCare tools (NLP extraction, red-flag
+    detection, safety engine, risk classification, adaptive questioning, case submission).
+
+    SAFETY: The deterministic Clinical Safety Engine ALWAYS overrides the AI.
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        user_input = request.data.get("message", "")
+        conversation_id = request.data.get("conversation_id")
+        context = request.data.get("context", {}) or {}
+
+        # Restart support
+        if context.get("restart") or (isinstance(user_input, str) and user_input.strip().lower() in ("restart", "start over", "new assessment")):
+            result = chat_assessment_service.restart(conversation_id)
+            return Response(result, status=status.HTTP_200_OK)
+
+        # First message (no conversation_id) -> start new assessment
+        if not conversation_id:
+            result = chat_assessment_service.start()
+            return Response(result, status=status.HTTP_200_OK)
+
+        result = chat_assessment_service.process(conversation_id, user_input)
+        return Response(result, status=status.HTTP_200_OK)

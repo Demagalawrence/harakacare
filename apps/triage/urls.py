@@ -34,8 +34,9 @@ urlpatterns = [
     # ---- Utility ----
     path('health/', views.TriageHealthCheckView.as_view(), name='health'),
     path('options/', views.TriageOptionsView.as_view(), name='options'),
+    path('chat/', views.ChatTriageView.as_view(), name='chat-triage'),
 
-    # ⚠️ ALWAYS LAST
+    # WARNING: ALWAYS LAST
     path('<str:patient_token>/', views.TriageResultView.as_view(), name='result'),
 ]
 

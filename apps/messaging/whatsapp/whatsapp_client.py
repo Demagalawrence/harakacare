@@ -210,7 +210,7 @@ class DialogClient:
     def send_typing(self, to: str) -> None:
         """Best-effort: mark as read to show 'typing' indicator on some clients."""
         try:
-            self.send_text(to, "⏳")  # Temporary — remove if you prefer silence
+            self.send_text(to, "[CLOCK]")  # Temporary — remove if you prefer silence
         except DialogAPIError:
             pass
 
@@ -224,8 +224,8 @@ class DialogAPIError(Exception):
 try:
     dialog_client = DialogClient()
 except ValueError as e:
-    print(f"⚠️  WhatsApp client not initialized: {e}")
+    print("WARNING: WhatsApp client not initialized: %s" % e)
     dialog_client = None
 except Exception as e:
-    print(f"⚠️  WhatsApp client initialization failed: {e}")
+    print("WARNING: WhatsApp client initialization failed: %s" % e)
     dialog_client = None

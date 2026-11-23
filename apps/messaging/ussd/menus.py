@@ -152,7 +152,7 @@ MENU_TEXTS = {
 
     USSDMenu.EMERGENCY: {
         "en": (
-            "⚠️ EMERGENCY SIGNS DETECTED\n"
+            "WARNING: EMERGENCY SIGNS DETECTED\n"
             "Go to the nearest hospital NOW.\n"
             "Call emergency: 999 / 0800 100 066\n"
             "Do not wait."

@@ -139,7 +139,7 @@ class ClinicalContextTool:
             Context adjustment results with detailed modifiers
         """
         
-        print("\n📊 CLINICAL CONTEXT ADJUSTMENT")
+        print("\n[CHART] CLINICAL CONTEXT ADJUSTMENT")
         
         # ====================================================================
         # Extract all relevant data

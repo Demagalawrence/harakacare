@@ -282,7 +282,7 @@ class ConversationAdmin(ModelAdmin):
         if obj.completed:
             return format_html('<span style="color: #28a745;">{}</span>', '✓ Completed')
         else:
-            return format_html('<span style="color: #ffc107; font-weight: bold;">{}</span>', '⚠ Incomplete')
+            return format_html('<span style="color: #ffc107; font-weight: bold;">{}</span>', '[WARNING] Incomplete')
     completed_colored.short_description = 'Status'
 
 
@@ -902,7 +902,7 @@ class FacilityCapacityLogAdmin(ModelAdmin):
 try:
     create_admin_groups()
 except Exception as e:
-    print(f"⚠️  Could not create admin groups on startup: {e}")
+    print("WARNING: Could not create admin groups on startup: %s" % e)
     # Don't fail deployment - groups will be created when needed
 
 

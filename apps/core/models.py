@@ -158,3 +158,82 @@ class UserProfile(models.Model):
         if not self.facility:
             return False
         return case.assigned_facility == self.facility
+
+
+class AuditLog(models.Model):
+    """
+    Audit trail for all sensitive actions in the system.
+    Records who did what, when, and on which resource.
+    """
+    
+    class ActionType(models.TextChoices):
+        CREATE = 'create', 'Create'
+        READ = 'read', 'Read'
+        UPDATE = 'update', 'Update'
+        DELETE = 'delete', 'Delete'
+        LOGIN = 'login', 'Login'
+        LOGOUT = 'logout', 'Logout'
+        OVERRIDE = 'override', 'AI Recommendation Override'
+        ESCALATE = 'escalate', 'Case Escalation'
+        ASSIGN = 'assign', 'Case Assignment'
+    
+    user = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='audit_logs',
+        help_text='User who performed the action'
+    )
+    action = models.CharField(
+        max_length=20,
+        choices=ActionType.choices,
+        help_text='Type of action performed'
+    )
+    resource_type = models.CharField(
+        max_length=50,
+        help_text='Type of resource (e.g., TriageSession, Facility, User)'
+    )
+    resource_id = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        help_text='ID of the affected resource'
+    )
+    resource_identifier = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        help_text='Human-readable identifier (e.g., patient token, not medical data)'
+    )
+    details = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text='Additional context (no sensitive medical data)'
+    )
+    ip_address = models.GenericIPAddressField(
+        blank=True,
+        null=True,
+        help_text='IP address of the client'
+    )
+    user_agent = models.CharField(
+        max_length=500,
+        blank=True,
+        null=True,
+        help_text='Client user agent string'
+    )
+    timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
+    
+    class Meta:
+        verbose_name = 'Audit Log'
+        verbose_name_plural = 'Audit Logs'
+        ordering = ['-timestamp']
+        indexes = [
+            models.Index(fields=['user', '-timestamp']),
+            models.Index(fields=['resource_type', 'resource_id']),
+            models.Index(fields=['action', '-timestamp']),
+        ]
+    
+    def __str__(self):
+        user = self.user.username if self.user else 'system'
+        return f"{user} - {self.action} - {self.resource_type} - {self.timestamp}"

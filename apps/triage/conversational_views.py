@@ -192,7 +192,7 @@ class ConversationalTriageView(views.APIView):
         
         serializer = ConversationalIntakeSerializer(data=request.data)
         if not serializer.is_valid():
-            print(f"❌ Validation failed: {serializer.errors}")
+            print(f"[ERROR] Validation failed: {serializer.errors}")
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
         message = serializer.validated_data['message']
@@ -207,7 +207,7 @@ class ConversationalTriageView(views.APIView):
         if conversation_id:
             # CONTINUING existing conversation
             patient_token = conversation_id
-            print(f"🔄 CONTINUING conversation with token: {patient_token}")
+            print(f"[BUG] CONTINUING conversation with token: {patient_token}")
         else:
             # STARTING new conversation
             patient_token = self._generate_patient_token()
@@ -230,14 +230,14 @@ class ConversationalTriageView(views.APIView):
             # Add channel to result
             result['channel'] = channel
             
-            print(f"✅ Processing complete")
+            print(f"[OK] Processing complete")
             print(f"   Status: {result.get('status')}")
             print(f"   Intent: {result.get('intent')}")
             print(f"   Patient token: {result.get('patient_token')}")
             
             # Check for red flags
             if result.get('red_flags_detected'):
-                print(f"   🚩 RED FLAGS DETECTED!")
+                print(f"   [ECO] RED FLAGS DETECTED!")
             
             # If complete, optionally auto-submit to regular triage
             # If complete, optionally auto-submit to regular triage
@@ -246,7 +246,7 @@ class ConversationalTriageView(views.APIView):
                 
                 # Check if triage_result is already in the result (from agent)
                 if 'triage_result' in result:
-                    print(f"   ✅ Triage already completed by agent: {result['triage_result'].get('risk_level')}")
+                    print(f"   [OK] Triage already completed by agent: {result['triage_result'].get('risk_level')}")
                 else:
                     # Fallback: validate and submit manually
                     intake_tool = IntakeValidationTool()
@@ -269,12 +269,12 @@ class ConversationalTriageView(views.APIView):
                         
                         print(f"   Triage result: {session.risk_level}")
                     else:
-                        print(f"   ❌ Validation failed: {errors}")
+                        print(f"   [ERROR] Validation failed: {errors}")
                         result['validation_errors'] = errors            
             return Response(result, status=status.HTTP_200_OK)
             
         except Exception as e:
-            print(f"❌ Error: {e}")
+            print(f"[ERROR] Error: {e}")
             import traceback
             traceback.print_exc()
             print("="*70 + "\n")
@@ -481,7 +481,7 @@ class HybridTriageView(views.APIView):
         Detects input type and routes to appropriate handler
         """
         
-        print(f"\n🔄 HYBRID TRIAGE - Token: {patient_token}")
+        print(f"\n[BUG] HYBRID TRIAGE - Token: {patient_token}")
         
         # Check if it's conversational (has 'message' field)
         if 'message' in request.data:
@@ -524,14 +524,14 @@ class HybridTriageView(views.APIView):
             is_valid, cleaned_data, errors = tool.validate(request.data)
             
             if not is_valid:
-                print(f"   ❌ Validation failed: {errors}")
+                print(f"   [ERROR] Validation failed: {errors}")
                 return Response({
                     'error': 'Validation failed',
                     'errors': errors
                 }, status=status.HTTP_400_BAD_REQUEST)
             
             # Auto-submit to triage
-            print(f"   ✅ Valid, submitting to orchestrator")
+            print(f"   [OK] Valid, submitting to orchestrator")
             session, decision, red_flags = TriageOrchestrator.run(
                 patient_token,
                 cleaned_data

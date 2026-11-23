@@ -39,7 +39,7 @@ def simulate_triage_intake():
 
 def simulate_facility_matching(triage_data):
     """Simulate facility matching process"""
-    print("\n🔍 Simulating Facility Matching...")
+    print("\n[SEARCH] Simulating Facility Matching...")
     
     # Mock facilities database
     facilities = [
@@ -239,7 +239,7 @@ def simulate_facility_response(notification_payload):
 
 def simulate_followup_notification(routing_result, facility_response):
     """Simulate notification to Follow-up Agent"""
-    print("\n📱 Simulating Follow-up Agent Notification...")
+    print("\n[CAMERA] Simulating Follow-up Agent Notification...")
     
     followup_data = {
         "patient_token": "DEMO_PATIENT_TOKEN_001",
@@ -261,7 +261,7 @@ def simulate_followup_notification(routing_result, facility_response):
 
 def main():
     """Run complete Facility Agent workflow demo"""
-    print("🚀 HarakaCare Facility Agent - Complete Workflow Demo")
+    print("[ROCKET] HarakaCare Facility Agent - Complete Workflow Demo")
     print("=" * 60)
     
     # Step 1: Receive triage data
@@ -284,27 +284,27 @@ def main():
     
     print("\n" + "=" * 60)
     print("🎉 Complete Workflow Demo Finished!")
-    print("\n📋 Workflow Summary:")
-    print("   ✅ Triage data received from Triage Agent")
-    print("   ✅ Facilities matched and scored")
-    print("   ✅ Prioritization completed")
-    print("   ✅ Automatic booking triggered (high-risk case)")
-    print("   ✅ Facility notified and responded")
-    print("   ✅ Follow-up Agent notified")
-    print("   ✅ Patient successfully routed to care")
+    print("\n[CLIPBOARD] Workflow Summary:")
+    print("   [OK] Triage data received from Triage Agent")
+    print("   [OK] Facilities matched and scored")
+    print("   [OK] Prioritization completed")
+    print("   [OK] Automatic booking triggered (high-risk case)")
+    print("   [OK] Facility notified and responded")
+    print("   [OK] Follow-up Agent notified")
+    print("   [OK] Patient successfully routed to care")
     
-    print("\n🔧 Implementation Status:")
-    print("   ✅ Facility Matching Algorithm")
-    print("   ✅ Hybrid Booking Model")
-    print("   ✅ Priority-based Routing")
-    print("   ✅ Multi-channel Notifications")
-    print("   ✅ Real-time Response Handling")
-    print("   ✅ Inter-agent Communication")
-    print("   ✅ Audit Trail & Logging")
+    print("\n[GUN] Implementation Status:")
+    print("   [OK] Facility Matching Algorithm")
+    print("   [OK] Hybrid Booking Model")
+    print("   [OK] Priority-based Routing")
+    print("   [OK] Multi-channel Notifications")
+    print("   [OK] Real-time Response Handling")
+    print("   [OK] Inter-agent Communication")
+    print("   [OK] Audit Trail & Logging")
     
     print(f"\n⏱️  Total Processing Time: < 2 seconds")
     print(f"🏥 Selected Facility: {routing_result['recommended_facility']['name']}")
-    print(f"📊 Match Score: {routing_result['candidates'][0]['match_score']}")
+    print(f"[CHART] Match Score: {routing_result['candidates'][0]['match_score']}")
     print(f"📍 Distance: {routing_result['candidates'][0]['distance_km']} km")
 
 

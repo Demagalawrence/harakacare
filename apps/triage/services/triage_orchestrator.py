@@ -1,6 +1,6 @@
 """
 Triage Orchestrator - UPDATED FOR COMPLAINT-BASED, AGE-ADAPTIVE TRIAGE
-Coordinates all triage tools and manages the session lifecycle
+Phase 3: Integrated with NLP, ML risk classification, and Clinical Safety Engine
 """
 
 from django.utils import timezone
@@ -12,11 +12,16 @@ from apps.triage.models import (
     ClinicalContext
 )
 
-# Import tools - only the ones we need for now
+# Import tools - existing
 from apps.triage.tools.red_flag_detection import RedFlagDetectionTool
 from apps.triage.tools.risk_classification import RiskClassificationTool
 from apps.triage.tools.clinical_context import ClinicalContextTool
 from apps.triage.tools.decision_synthesis import DecisionSynthesisTool
+
+# Phase 3: New AI components
+from apps.triage.nlp_symptom_extraction import parse_natural_language, get_clinician_approved_questions
+from apps.triage.ml_risk_classifier import ml_classifier
+from apps.triage.clinical_safety_engine import safety_engine
 
 import logging
 
@@ -43,7 +48,7 @@ class TriageOrchestrator:
         from django.utils import timezone
         
         print("\n" + "="*70)
-        print(f"🔄 TRIAGE ORCHESTRATOR - Token: {patient_token}")
+        print(f"[BUG] TRIAGE ORCHESTRATOR - Token: {patient_token}")
         print("="*70)
 
         # Remove fields that shouldn't be set directly
@@ -85,7 +90,7 @@ class TriageOrchestrator:
             try:
                 session = TriageSession.objects.get(patient_token=patient_token)
                 created = False
-                print(f"📝 Updating existing session (turns: {session.conversation_turns})")
+                print(f"[MEMO] Updating existing session (turns: {session.conversation_turns})")
             except TriageSession.DoesNotExist:
                 # Fall back to create if doesn't exist
                 session, created = TriageSession.objects.get_or_create(
@@ -99,7 +104,7 @@ class TriageOrchestrator:
                 patient_token=patient_token,
                 defaults=defaults
             )
-            print(f"{'🆕 Created new session' if created else '📝 Using existing session'}")
+            print(f"{'🆕 Created new session' if created else '[MEMO] Using existing session'}")
 
         # ====================================================================
         # STEP 2: Update session with all provided data
@@ -141,9 +146,9 @@ class TriageOrchestrator:
 
         if update_fields:
             session.save(update_fields=update_fields)
-            print(f"✅ Session updated with {len(update_fields)} fields")
+            print(f"[OK] Session updated with {len(update_fields)} fields")
         else:
-            print("✅ No fields to update")
+            print("[OK] No fields to update")
 
         # ====================================================================
         # STEP 3: RED FLAG DETECTION (WHO ABCD)
@@ -153,7 +158,7 @@ class TriageOrchestrator:
             red_flag_tool = RedFlagDetectionTool()
             red_flag_result = red_flag_tool.detect(session, cleaned_data)
         except Exception as e:
-            print(f"⚠️ Red flag detection failed: {e}, using default")
+            print(f"WARNING: Red flag detection failed: {e}, using default")
             red_flag_result = {
                 'has_red_flags': False,
                 'emergency_override': False,
@@ -173,14 +178,42 @@ class TriageOrchestrator:
         
         session.save(update_fields=['has_red_flags', 'red_flag_indicators', 'red_flag_detected_at_turn'])
         
-        print(f"🚩 Red flags detected: {red_flag_result.get('has_red_flags', False)}")
+        print(f"Red flags detected: {red_flag_result.get('has_red_flags', False)}")
 
         # ====================================================================
-        # STEP 4: RISK CLASSIFICATION
+        # STEP 3.5: CLINICAL SAFETY ENGINE (Phase 3 - NEW)
+        # Evaluated BEFORE ML recommendations - emergency rules always win
         # ====================================================================
         
+        try:
+            safety_result = safety_engine.evaluate(
+                triage_data={
+                    'red_flag_indicators': session.red_flag_indicators,
+                    'age_group': session.age_group,
+                    'sex': session.sex,
+                    'pregnancy_status': session.pregnancy_status,
+                    'has_chronic_conditions': session.has_chronic_conditions,
+                    'on_medication': session.on_medication,
+                    'symptom_severity': session.symptom_severity,
+                    'complaint_group': session.complaint_group,
+                },
+                ml_risk_level=None,  # Will be set after ML classification
+                ml_confidence=None,
+            )
+        except Exception as e:
+            print(f"WARNING: Safety engine failed: {e}, continuing without safety override")
+            safety_result = None
+        
+        # ====================================================================
+        # STEP 4: RISK CLASSIFICATION (Rule-based + ML + Safety override)
+        # ====================================================================
+        
+        # First: Get rule-based risk classification
+        rule_based_risk = None
+        rule_based_confidence = 0.5
+        
         if red_flag_result.get('emergency_override', False):
-            # Emergency override - always high risk
+            # Emergency override from red flag tool - always high risk
             ai_risk_level = 'high'
             risk_confidence = 1.0
             risk_result = {
@@ -191,31 +224,20 @@ class TriageOrchestrator:
                 'raw_score': 1.0,
                 'feature_importance': None
             }
-            print("⚠️ EMERGENCY OVERRIDE - Risk set to HIGH")
+            print("EMERGENCY OVERRIDE - Risk set to HIGH (red flag tool)")
         else:
             try:
-                # Normal risk classification
+                # Normal rule-based risk classification
                 risk_tool = RiskClassificationTool()
                 risk_result = risk_tool.classify(session, cleaned_data)
+                rule_based_risk = risk_result['risk_level']
+                rule_based_confidence = risk_result['confidence']
                 ai_risk_level = risk_result['risk_level']
                 risk_confidence = risk_result['confidence']
                 
-                # Save risk classification record
-                RiskClassification.objects.update_or_create(
-                    triage_session=session,
-                    defaults={
-                        'raw_risk_score': risk_result.get('raw_score', 0.5),
-                        'ai_risk_level': ai_risk_level,
-                        'confidence_score': risk_confidence,
-                        'model_name': risk_result.get('model_name', 'default_model'),
-                        'model_version': risk_result.get('model_version', '1.0'),
-                        'inference_time_ms': risk_result.get('inference_time_ms'),
-                        'feature_importance': risk_result.get('feature_importance'),
-                        'complaint_embedding': risk_result.get('complaint_embedding')
-                    }
-                )
+                print(f"AI Risk (rule-based): {ai_risk_level} (confidence: {risk_confidence:.2f})")
             except Exception as e:
-                print(f"⚠️ Risk classification failed: {e}, using default")
+                print(f"WARNING: Risk classification failed: {e}, using default")
                 ai_risk_level = 'medium'
                 risk_confidence = 0.5
                 risk_result = {
@@ -226,8 +248,95 @@ class TriageOrchestrator:
                     'raw_score': 0.5,
                     'feature_importance': None
                 }
+        
+        # Second: Get ML risk classification (Phase 3)
+        ml_result = None
+        try:
+            ml_triage_data = {
+                'age_group': session.age_group,
+                'sex': session.sex,
+                'complaint_group': session.complaint_group,
+                'symptom_severity': session.symptom_severity,
+                'symptom_duration': session.symptom_duration,
+                'progression_status': session.progression_status,
+                'has_chronic_conditions': session.has_chronic_conditions,
+                'is_pregnant': session.pregnancy_status in ['yes', 'possible'],
+                'on_medication': session.on_medication,
+                'red_flag_indicators': session.red_flag_indicators or {},
+            }
+            ml_result = ml_classifier.predict(ml_triage_data)
+            print(f"ML Risk: {ml_result.risk_level} (confidence: {ml_result.confidence:.2f}, model: {ml_result.model_name})")
+        except Exception as e:
+            print(f"WARNING: ML risk classification failed: {e}, using rule-based only")
+            ml_result = None
+        
+        # Third: Apply clinical safety engine override (if not already emergency)
+        if safety_result and not red_flag_result.get('emergency_override', False):
+            # Re-evaluate safety with ML risk level known
+            safety_result = safety_engine.evaluate(
+                triage_data={
+                    'red_flag_indicators': session.red_flag_indicators,
+                    'age_group': session.age_group,
+                    'sex': session.sex,
+                    'pregnancy_status': session.pregnancy_status,
+                    'has_chronic_conditions': session.has_chronic_conditions,
+                    'on_medication': session.on_medication,
+                    'symptom_severity': session.symptom_severity,
+                    'complaint_group': session.complaint_group,
+                },
+                ml_risk_level=ai_risk_level,
+                ml_confidence=risk_confidence,
+            )
             
-            print(f"🤖 AI Risk: {ai_risk_level} (confidence: {risk_confidence:.2f})")
+            # Safety override: if safety engine says emergency/urgent, override ML
+            if safety_result.ml_override_applied:
+                if safety_result.safety_level.value == 'emergency':
+                    ai_risk_level = 'high'
+                    risk_confidence = max(risk_confidence, 0.9)
+                elif safety_result.safety_level.value == 'urgent' and ai_risk_level == 'low':
+                    ai_risk_level = 'medium'
+                    risk_confidence = max(risk_confidence, 0.7)
+                
+                print(f"SAFETY OVERRIDE applied: {safety_result.reasoning}")
+        
+        # Use the higher of rule-based and ML risk (conservative bias)
+        risk_hierarchy = {'low': 0, 'medium': 1, 'high': 2}
+        ml_risk_level = ml_result.risk_level if ml_result else ai_risk_level
+        
+        if risk_hierarchy.get(ml_risk_level, 0) > risk_hierarchy.get(ai_risk_level, 0):
+            # ML predicts higher risk - use conservative approach
+            final_ai_risk = ml_risk_level
+        else:
+            final_ai_risk = ai_risk_level
+        
+        # Safety engine has final say
+        if safety_result:
+            if safety_result.safety_level.value == 'emergency':
+                final_ai_risk = 'high'
+                risk_confidence = max(risk_confidence, 0.95)
+            elif safety_result.safety_level.value == 'urgent' and final_ai_risk == 'low':
+                final_ai_risk = 'medium'
+                risk_confidence = max(risk_confidence, 0.8)
+        
+        ai_risk_level = final_ai_risk
+        
+        # Save risk classification record (combining rule-based and ML)
+        try:
+            RiskClassification.objects.update_or_create(
+                triage_session=session,
+                defaults={
+                    'raw_risk_score': risk_confidence,
+                    'ai_risk_level': ai_risk_level,
+                    'confidence_score': risk_confidence,
+                    'model_name': f"{risk_result.get('model_name', 'rule-based')}+{ml_result.model_name if ml_result else 'none'}",
+                    'model_version': f"{risk_result.get('model_version', '1.0')}+{ml_result.model_version if ml_result else 'n/a'}",
+                    'inference_time_ms': ml_result.inference_time_ms if ml_result else None,
+                    'feature_importance': ml_result.feature_importance if ml_result else risk_result.get('feature_importance'),
+                    'complaint_embedding': None,
+                }
+            )
+        except Exception as e:
+            print(f"WARNING: Failed to save risk classification: {e}")
 
         # ====================================================================
         # STEP 5: CLINICAL CONTEXT
@@ -239,7 +348,7 @@ class TriageOrchestrator:
                 session, cleaned_data, ai_risk_level, red_flag_result
             )
         except Exception as e:
-            print(f"⚠️ Clinical context failed: {e}, using default")
+            print(f"WARNING: Clinical context failed: {e}, using default")
             context_result = {
                 'age_modifier': 0.0,
                 'pregnancy_modifier': 0.0,
@@ -269,9 +378,9 @@ class TriageOrchestrator:
                 }
             )
         except Exception as e:
-            print(f"⚠️ Failed to save clinical context: {e}")
+            print(f"WARNING: Failed to save clinical context: {e}")
         
-        print(f"📊 Clinical adjustment: {context_result.get('total_adjustment', 0.0):+.2f}")
+        print(f"[CHART] Clinical adjustment: {context_result.get('total_adjustment', 0.0):+.2f}")
 
         # ====================================================================
         # STEP 6: DECISION SYNTHESIS
@@ -286,7 +395,7 @@ class TriageOrchestrator:
                 context_result=context_result
             )
         except Exception as e:
-            print(f"⚠️ Decision synthesis failed: {e}, using default")
+            print(f"WARNING: Decision synthesis failed: {e}, using default")
             final_decision = {
                 'risk_level': ai_risk_level,
                 'follow_up_priority': 'urgent' if ai_risk_level == 'high' else 'routine',
@@ -314,7 +423,7 @@ class TriageOrchestrator:
                 }
             )
         except Exception as e:
-            print(f"⚠️ Failed to save triage decision: {e}")
+            print(f"WARNING: Failed to save triage decision: {e}")
 
         # ====================================================================
         # STEP 7: Update session with final results
@@ -339,7 +448,7 @@ class TriageOrchestrator:
         session.save()
 
         print("\n" + "="*70)
-        print(f"✅ TRIAGE COMPLETE - Final Risk: {final_decision['risk_level']}")
+        print(f"[OK] TRIAGE COMPLETE - Final Risk: {final_decision['risk_level']}")
         print(f"   Decision basis: {final_decision.get('decision_basis', 'unknown')}")
         print(f"   Conversation turns: {session.conversation_turns}")
         print("="*70 + "\n")
@@ -368,7 +477,7 @@ class TriageOrchestrator:
                 session.save(update_fields=['forwarded_to_facility'])
         except Exception as e:
             # Never let facility dispatch crash the triage response
-            print(f"⚠️  Facility dispatch error (non-fatal): {e}")
+            print(f"WARNING:  Facility dispatch error (non-fatal): {e}")
             logger.warning("Facility bridge error for %s: %s", patient_token, e)
 
         return session, final_decision, red_flag_result

@@ -15,7 +15,7 @@ from apps.triage.tools.conversational_intake_agent import ConversationalIntakeAg
 
 def test_age_sex_gate():
     """Test the combined age/sex gate functionality"""
-    print("🧪 TESTING AGE/SEX GATE")
+    print("[TEST_TUBE] TESTING AGE/SEX GATE")
     print("=" * 50)
     
     agent = ConversationalIntakeAgent()
@@ -31,19 +31,19 @@ def test_age_sex_gate():
     ]
     
     for input_val, expected in test_cases:
-        print(f"\n📝 Testing: {input_val} -> {expected}")
+        print(f"\n[MEMO] Testing: {input_val} -> {expected}")
         
         # Test menu resolution
         matched, result = MenuResolver.resolve("age_sex_gate", input_val)
         
         if matched:
-            print(f"✅ RESOLVED: {result}")
+            print(f"[OK] RESOLVED: {result}")
             if result == expected:
-                print(f"✅ CORRECT: Matches expected output")
+                print(f"[OK] CORRECT: Matches expected output")
             else:
-                print(f"❌ INCORRECT: Expected {expected}, got {result}")
+                print(f"[ERROR] INCORRECT: Expected {expected}, got {result}")
         else:
-            print(f"❌ NOT RESOLVED: Input '{input_val}' not recognized")
+            print(f"[ERROR] NOT RESOLVED: Input '{input_val}' not recognized")
     
     print("\n" + "=" * 50)
 
@@ -63,18 +63,18 @@ def test_pregnancy_menu():
     ]
     
     for input_val, expected in test_cases:
-        print(f"\n📝 Testing: {input_val} -> {expected}")
+        print(f"\n[MEMO] Testing: {input_val} -> {expected}")
         
         matched, result = MenuResolver.resolve("pregnancy_status", input_val)
         
         if matched:
-            print(f"✅ RESOLVED: {result}")
+            print(f"[OK] RESOLVED: {result}")
             if result == expected:
-                print(f"✅ CORRECT: Matches expected output")
+                print(f"[OK] CORRECT: Matches expected output")
             else:
-                print(f"❌ INCORRECT: Expected {expected}, got {result}")
+                print(f"[ERROR] INCORRECT: Expected {expected}, got {result}")
         else:
-            print(f"❌ NOT RESOLVED: Input '{input_val}' not recognized")
+            print(f"[ERROR] NOT RESOLVED: Input '{input_val}' not recognized")
     
     print("\n" + "=" * 50)
 
@@ -97,7 +97,7 @@ def test_empathy_templates():
     ]
     
     for complaint, message in test_complaints:
-        print(f"\n📝 Testing complaint: {complaint}")
+        print(f"\n[MEMO] Testing complaint: {complaint}")
         print(f"Message: '{message}'")
         
         # Create mock state with this complaint
@@ -128,17 +128,17 @@ def test_empathy_templates():
             expected_words = expected_keywords[complaint]
             found_words = [word for word in expected_words if word.lower() in empathy.lower()]
             if found_words:
-                print(f"✅ COMPLAINT-SPECIFIC: Found keywords {found_words}")
+                print(f"[OK] COMPLAINT-SPECIFIC: Found keywords {found_words}")
             else:
-                print(f"⚠️  NOT COMPLAINT-SPECIFIC: Expected keywords {expected_words}")
+                print(f"WARNING:  NOT COMPLAINT-SPECIFIC: Expected keywords {expected_words}")
         else:
-            print(f"✅ GENERIC EMPATHY: Appropriate for unspecified complaint")
+            print(f"[OK] GENERIC EMPATHY: Appropriate for unspecified complaint")
     
     print("\n" + "=" * 50)
 
 def test_priority_order():
     """Test the new field priority order"""
-    print("\n📋 TESTING PRIORITY ORDER")
+    print("\n[CLIPBOARD] TESTING PRIORITY ORDER")
     print("=" * 50)
     
     agent = ConversationalIntakeAgent()
@@ -168,19 +168,19 @@ def test_priority_order():
     if missing:
         first_missing = missing[0]
         if first_missing in ["age_group", "sex"]:
-            print("✅ CORRECT: Age/sex are highest priority")
+            print("[OK] CORRECT: Age/sex are highest priority")
         else:
-            print(f"❌ INCORRECT: First missing field is '{first_missing}', should be age_group or sex")
+            print(f"[ERROR] INCORRECT: First missing field is '{first_missing}', should be age_group or sex")
     
     # Check if consents is third (after demographics, before symptoms)
     consents_index = missing.index("consents") if "consents" in missing else -1
-    print(f"✅ CONSENTS PRIORITY: Position {consents_index} in missing list")
+    print(f"[OK] CONSENTS PRIORITY: Position {consents_index} in missing list")
     
     print("\n" + "=" * 50)
 
 def test_step_progress():
     """Test step progress calculation"""
-    print("\n📊 TESTING STEP PROGRESS")
+    print("\n[CHART] TESTING STEP PROGRESS")
     print("=" * 50)
     
     agent = ConversationalIntakeAgent()
@@ -194,7 +194,7 @@ def test_step_progress():
     ]
     
     for missing_fields, expected_progress in scenarios:
-        print(f"\n📝 Missing: {missing_fields}")
+        print(f"\n[MEMO] Missing: {missing_fields}")
         
         # Create mock state
         mock_state = type('MockState', (), {
@@ -210,14 +210,14 @@ def test_step_progress():
         actual = f"Step {current_step} of {total_fields}"
         
         if actual == expected:
-            print(f"✅ CORRECT: {actual}")
+            print(f"[OK] CORRECT: {actual}")
         else:
-            print(f"❌ INCORRECT: Expected '{expected}', got '{actual}'")
+            print(f"[ERROR] INCORRECT: Expected '{expected}', got '{actual}'")
     
     print("\n" + "=" * 50)
 
 if __name__ == "__main__":
-    print("🧪 HARAKACARE CLINICAL PRIORITY TESTING")
+    print("[TEST_TUBE] HARAKACARE CLINICAL PRIORITY TESTING")
     print("=" * 60)
     
     try:
@@ -231,6 +231,6 @@ if __name__ == "__main__":
         print("=" * 60)
         
     except Exception as e:
-        print(f"\n❌ TEST FAILED: {e}")
+        print(f"\n[ERROR] TEST FAILED: {e}")
         import traceback
         traceback.print_exc()

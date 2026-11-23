@@ -472,7 +472,7 @@ class ConversationalIntakeAgent:
         return self._build_question(state)
 
     def continue_conversation(self, token: str, message: str) -> Dict[str, Any]:
-        print(f"\n🔄 CONTINUE: {token}")
+        print(f"\n[BUG] CONTINUE: {token}")
         print(f"   Message: {message[:50]}...")
 
         state = self._load(token)
@@ -488,11 +488,11 @@ class ConversationalIntakeAgent:
         if state.last_question_field:
             resolved, value = self.menu_resolver.resolve(state.last_question_field, message)
             if resolved:
-                print(f"   ✅ Menu resolved: {state.last_question_field} = {value!r}")
+                print(f"   [OK] Menu resolved: {state.last_question_field} = {value!r}")
                 self._apply_structured_value(state, state.last_question_field, value)
                 state.last_question_field = None
             else:
-                print(f"   ⚠️ Menu not resolved for {state.last_question_field}, trying NLP")
+                print(f"   WARNING: Menu not resolved for {state.last_question_field}, trying NLP")
                 # Fall through to NLP extraction — user may have given a description
                 new = self._extract(message)
                 self._merge(state.extracted_info, new)
@@ -618,7 +618,7 @@ class ConversationalIntakeAgent:
                         content=last.get("content", ""),
                         turn=last.get("turn", state.turn_number),
                     )
-            print(f"   💾 Saved turn {state.turn_number}")
+            print(f"   [HOSPITAL] Saved turn {state.turn_number}")
         except Exception as e:
             logger.error(f"Error saving conversation state: {e}")
 
@@ -1315,12 +1315,12 @@ class ConversationalIntakeAgent:
                         if session.assessment_completed_at else None
                     ),
                 }
-                print(f"✅ Triage complete: {session.risk_level}")
+                print(f"[OK] Triage complete: {session.risk_level}")
             else:
-                print(f"⚠️ Validation failed: {errors}")
+                print(f"WARNING: Validation failed: {errors}")
                 triage_result = {"error": "Validation failed", "errors": errors}
         except Exception as e:
-            print(f"⚠️ Triage submission failed: {e}")
+            print(f"WARNING: Triage submission failed: {e}")
             import traceback; traceback.print_exc()
             triage_result = {"error": str(e)}
 
@@ -1407,13 +1407,13 @@ class ConversationalIntakeAgent:
     def _consistency_check(self, info: ExtractedInfo) -> List[str]:
         issues = []
         if info.sex == "male" and info.pregnancy_status in ["yes", "possible"]:
-            issues.append("⚠️ Male patient marked as pregnant — please verify.")
+            issues.append("WARNING: Male patient marked as pregnant — please verify.")
         if info.pregnancy_status in ["yes", "possible"] and info.age_group not in ["teen", "adult"]:
-            issues.append(f"⚠️ Pregnancy status unusual for age group '{info.age_group}'.")
+            issues.append(f"WARNING: Pregnancy status unusual for age group '{info.age_group}'.")
         if info.duration in ["less_than_1_hour", "1_6_hours"] and info.has_chronic_conditions:
-            issues.append("⚠️ Short duration with chronic condition — may be acute episode.")
+            issues.append("WARNING: Short duration with chronic condition — may be acute episode.")
         if info.severity in ["severe", "very_severe"] and info.severity_confidence < 0.6:
-            issues.append("⚠️ Severe symptoms with low confidence — confirm.")
+            issues.append("WARNING: Severe symptoms with low confidence — confirm.")
         return issues
 
     def _clinical_suggestions(self, info: ExtractedInfo, intent: str) -> List[Dict]:

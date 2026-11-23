@@ -294,7 +294,7 @@ class IntakeValidationTool:
         self.errors = []
         self.warnings = []
 
-        print("\n🔍 INTAKE VALIDATION")
+        print("\n[SEARCH] INTAKE VALIDATION")
         
         # Handle deprecated fields (add warnings)
         self._check_deprecated_fields(data)

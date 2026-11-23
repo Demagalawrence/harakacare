@@ -11,24 +11,23 @@ DEBUG = True
 
 ALLOWED_HOSTS = ['*']
 
-# Development-specific apps
-INSTALLED_APPS += [
-    'debug_toolbar',
-]
+# Development-specific apps (debug_toolbar optional - install separately if needed)
+# INSTALLED_APPS += [
+#     'debug_toolbar',
+# ]
 
-MIDDLEWARE += [
-    'debug_toolbar.middleware.DebugToolbarMiddleware',
-]
+# MIDDLEWARE += [
+#     'debug_toolbar.middleware.DebugToolbarMiddleware',
+# ]
 
-# Debug Toolbar Configuration
-INTERNAL_IPS = [
-    '127.0.0.1',
-    'localhost',
-]
+# INTERNAL_IPS = [
+#     '127.0.0.1',
+#     'localhost',
+# ]
 
-DEBUG_TOOLBAR_CONFIG = {
-    'SHOW_TOOLBAR_CALLBACK': lambda request: DEBUG,
-}
+# DEBUG_TOOLBAR_CONFIG = {
+#     'SHOW_TOOLBAR_CALLBACK': lambda request: DEBUG,
+# }
 
 # Database - Use local PostgreSQL for development
 # DATABASES = {
