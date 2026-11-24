@@ -185,6 +185,11 @@ class FacilityMatchingTool:
         score += wait_score * 0.05
         factors.append(f"Wait: {wait_score:.2f}")
 
+        # 6. Medication availability score (0-0.1)
+        medication_score = self._calculate_medication_score(facility, routing)
+        score += medication_score * 0.1
+        factors.append(f"Meds: {medication_score:.2f}")
+
         # Determine if facility can handle the case
         has_capacity = facility.has_capacity()
         offers_service = self._offers_required_services(facility, routing)
@@ -293,6 +298,51 @@ class FacilityMatchingTool:
             return 0.3
         else:
             return 0.1
+
+    def _get_required_medications(self, routing: FacilityRouting) -> List[str]:
+        """Determine likely required medications based on complaint group."""
+        medication_map = {
+            'fever': ['paracetamol', 'antimalarial', 'antibiotic'],
+            'breathing': ['salbutamol', 'antibiotic', 'oxygen'],
+            'chest_pain': ['aspirin', 'nitroglycerin'],
+            'abdominal': ['ors', 'antibiotic', 'antacid'],
+            'headache': ['paracetamol', 'ibuprofen'],
+            'injury': ['tetanus', 'antibiotic', 'analgesic'],
+            'bleeding': ['tranexamic_acid', 'iv_fluids'],
+            'pregnancy': ['oxytocin', 'iron', 'folic_acid'],
+            'skin': ['antibiotic', 'antifungal', 'antihistamine'],
+            'feeding': ['ors', 'zinc'],
+            'mental_health': ['antidepressant'],
+            'other': [],
+        }
+        complaint = (routing.primary_symptom or '').lower()
+        meds = medication_map.get(complaint, [])
+        # also check chronic conditions
+        for cond in (routing.chronic_conditions or []):
+            if cond == 'malaria':
+                meds.append('antimalarial')
+            if cond == 'diabetes':
+                meds.append('insulin')
+            if cond == 'hypertension':
+                meds.append('antihypertensive')
+        return list(set(meds))
+
+    def _calculate_medication_score(self, facility: Facility, routing: FacilityRouting) -> float:
+        """Score based on whether the facility stocks required medications."""
+        required = self._get_required_medications(routing)
+        if not required:
+            return 0.8  # neutral if no specific meds required
+        available = facility.available_medications or []
+        if not available:
+            return 0.5  # unknown stock -> neutral
+        avail_lower = [str(m).lower() for m in available]
+        matches = sum(1 for m in required if any(m in a for a in avail_lower))
+        if matches == len(required):
+            return 1.0
+        elif matches >= len(required) * 0.5:
+            return 0.6
+        else:
+            return 0.3
 
     def _get_required_services(self, routing: FacilityRouting) -> List[str]:
         """Determine required services based on symptoms and conditions"""

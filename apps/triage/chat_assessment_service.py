@@ -382,7 +382,7 @@ class ChatAssessmentService:
             if not patient_data.get("age_group") or not patient_data.get("sex"):
                 state["stage"] = "demographics"
             else:
-                state["stage"] = "adaptive"
+                state["stage"] = "location"
             state["patient_data"] = patient_data
             self._save_state(conv, state)
 
@@ -397,10 +397,17 @@ class ChatAssessmentService:
                     f"Thank you. I noted: {cg.replace('_', ' ')}.\n\n"
                     "To tailor the assessment, please tell me the patient's age group and sex."
                 )
+            elif state["stage"] == "location":
+                msg = (
+                    f"Thank you. I noted: {cg.replace('_', ' ')}.\n\n"
+                    "To find the nearest health center, please tell me your district or area."
+                )
             self._add_message(conv, "agent", msg)
             suggested = []
             if state["stage"] == "demographics":
-                suggested = [label for _, label in AGE_BANDS[:3]] + ["Adult (18-64 years)", "Male", "Female"]
+                suggested = [label for _, label in AGE_BANDS] + ["Male", "Female", "Other / Prefer not to say"]
+            elif state["stage"] == "location":
+                suggested = ["Kampala", "Wakiso", "Mukono", "Jinja", "Gulu", "Mbarara"]
             return self._build_response(conv, state, msg, suggested=suggested, progress=self._progress(state["stage"], state), safety=safety)
 
         # ---- demographics ----
@@ -436,13 +443,17 @@ class ChatAssessmentService:
                 patient_data["sex"] = "female"
 
             if patient_data.get("age_group") and patient_data.get("sex"):
-                state["stage"] = "adaptive"
+                state["stage"] = "location"
             else:
                 state["stage"] = "demographics"
             state["patient_data"] = patient_data
             self._save_state(conv, state)
 
-            if state["stage"] == "adaptive":
+            if state["stage"] == "location":
+                msg = "Thank you. To find the nearest health center, please tell me your district or area."
+                self._add_message(conv, "agent", msg)
+                return self._build_response(conv, state, msg, suggested=["Kampala", "Wakiso", "Mukono", "Jinja"], progress=30)
+            elif state["stage"] == "adaptive":
                 msg = "Thank you. Now let me ask a few follow-up questions."
                 self._add_message(conv, "agent", msg)
                 # immediately ask first adaptive question
@@ -458,7 +469,27 @@ class ChatAssessmentService:
                 suggested = [label for _, label in AGE_BANDS] + ["Male", "Female", "Other / Prefer not to say"]
                 return self._build_response(conv, state, msg, suggested=suggested, progress=25)
 
-        # ---- adaptive questioning loop ----
+            # ---- location (district) ----
+        if stage == "location":
+            district = text.strip()
+            if district and len(district) >= 2:
+                patient_data["district"] = district
+            if patient_data.get("district"):
+                state["stage"] = "adaptive"
+            else:
+                state["stage"] = "location"
+            state["patient_data"] = patient_data
+            self._save_state(conv, state)
+            if state["stage"] == "adaptive":
+                msg = "Thank you. Now let me ask a few follow-up questions."
+                self._add_message(conv, "agent", msg)
+                return self._ask_adaptive(conv, state, msg_prefix=msg)
+            else:
+                msg = "Please tell me your district or area so I can find the nearest health center."
+                self._add_message(conv, "agent", msg)
+                return self._build_response(conv, state, msg, suggested=["Kampala", "Wakiso", "Mukono", "Jinja"], progress=30)
+
+    # ---- adaptive questioning loop ----
         if stage == "adaptive":
             # record previous answer into symptom_indicators if an adaptive question was pending
             pending_q = state.get("pending_question")
@@ -590,6 +621,9 @@ class ChatAssessmentService:
             "symptom_indicators": patient_data.get("symptom_indicators", {}) or {},
             "red_flag_indicators": patient_data.get("red_flag_indicators", {}) or {},
             "risk_modifiers": patient_data.get("risk_modifiers", {}) or {},
+            "district": patient_data.get("district", ""),
+            "device_location_lat": patient_data.get("device_location_lat"),
+            "device_location_lng": patient_data.get("device_location_lng"),
         }
 
         safety = state.get("safety") or self._run_safety(patient_data, patient_data.get("complaint_text", ""))
@@ -600,13 +634,26 @@ class ChatAssessmentService:
         risk_level = "low"
         recommended_action = "Please visit your nearest health facility for assessment."
         red_flags_list = []
+        facility_assignment = None
         try:
             result = self.orchestrator.run(conv.patient_token, cleaned_data, conversation_mode=True)
-            if isinstance(result, dict):
-                risk_level = result.get("risk_level", risk_level)
-                recommended_action = result.get("recommended_action", recommended_action)
-                red_flags_list = result.get("red_flags", []) or result.get("detected_flags", []) or []
-                case_reference = result.get("patient_token") or conv.patient_token
+            if isinstance(result, tuple) and len(result) >= 2:
+                session, final_decision = result[0], result[1]
+                red_flag_result = result[2] if len(result) > 2 else {}
+            elif isinstance(result, dict):
+                final_decision = result
+                red_flag_result = {}
+                session = None
+            else:
+                final_decision = {}
+                red_flag_result = {}
+                session = None
+            if isinstance(final_decision, dict):
+                risk_level = final_decision.get("risk_level", risk_level)
+                recommended_action = final_decision.get("recommended_action", recommended_action)
+                red_flags_list = final_decision.get("red_flags", []) or final_decision.get("detected_flags", []) or red_flags_list
+                case_reference = getattr(session, "patient_token", None) or conv.patient_token
+                facility_assignment = final_decision.get("facility_assignment")
         except Exception as e:
             logger.error(f"Orchestrator run failed during chat completion: {e}")
 
@@ -635,6 +682,7 @@ class ChatAssessmentService:
             },
             "recommended_next_steps": recommended_action,
             "disclaimer": "This AI assessment is NOT a confirmed medical diagnosis and does not replace a qualified healthcare professional.",
+            "facility_assignment": facility_assignment,
         }
 
         state["stage"] = "completed"
@@ -643,12 +691,42 @@ class ChatAssessmentService:
         state["case_reference"] = case_reference
         self._save_state(conv, state)
 
+        facility_msg = ""
+        fa = facility_assignment if isinstance(facility_assignment, dict) else {}
+        af = fa.get("assigned_facility") if isinstance(fa, dict) else None
+        if af:
+            name = af.get("name", "Health facility")
+            address = af.get("address", "")
+            district = af.get("district", "")
+            phone = af.get("phone_number", "")
+            lat = af.get("latitude")
+            lng = af.get("longitude")
+            distance = fa.get("distance_km")
+            meds = af.get("available_medications") or []
+            facility_msg = chr(10) + chr(10) + "Recommended health center: " + str(name)
+            if address:
+                facility_msg += chr(10) + "Address: " + str(address)
+            if district:
+                facility_msg += chr(10) + "District: " + str(district)
+            if lat is not None and lng is not None:
+                facility_msg += chr(10) + "Location: " + str(lat) + ", " + str(lng)
+                facility_msg += chr(10) + "Google Maps: https://www.google.com/maps?q=" + str(lat) + "," + str(lng)
+            if phone:
+                facility_msg += chr(10) + "Phone: " + str(phone)
+            if distance is not None:
+                facility_msg += chr(10) + "Distance: " + str(distance) + " km"
+            if meds:
+                facility_msg += chr(10) + "Medications available: " + ", ".join(str(m) for m in meds)
+            if fa.get("booking_type"):
+                facility_msg += chr(10) + "Booking: " + str(fa.get("booking_type"))
+
         msg = (
-            "✅ Assessment complete.\n\n"
-            f"Case reference: {case_reference}\n"
-            f"Urgency: {risk_level.upper()}\n\n"
-            f"{recommended_action}\n\n"
-            "⚠️ This is an AI assessment, NOT a medical diagnosis. "
+            "Assessment complete." + chr(10) + chr(10) +
+            "Case reference: " + str(case_reference) + chr(10) +
+            "Urgency: " + str(risk_level).upper() + chr(10) + chr(10) +
+            str(recommended_action) +
+            facility_msg + chr(10) + chr(10) +
+            "This is an AI assessment, NOT a medical diagnosis. " +
             "Please consult a qualified healthcare worker."
         )
         self._add_message(conv, "agent", msg)

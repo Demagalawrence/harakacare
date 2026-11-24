@@ -153,6 +153,14 @@ class Facility(models.Model):
         help_text='Select medical services offered at the facility (choose from standardized list)'
     )
     
+    # Medications available at this facility (list of medication codes/names)
+    available_medications = models.JSONField(
+        'available medications',
+        default=list,
+        blank=True,
+        help_text='List of medication codes/names stocked at this facility pharmacy'
+    )
+    
     # Operational data
     average_wait_time_minutes = models.IntegerField(
         'average wait time (minutes)',

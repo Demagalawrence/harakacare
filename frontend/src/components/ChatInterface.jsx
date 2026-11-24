@@ -220,6 +220,32 @@ const ChatInterface = () => {
               <div><strong>Warning signs:</strong> {assessment.important_findings.warning_signs.join(', ')}</div>
             )}
             <div className="mt-2 text-gray-700">{assessment.recommended_next_steps}</div>
+            {assessment.facility_assignment?.assigned_facility && (
+              <div className="mt-3 p-3 bg-white rounded-lg border border-gray-200">
+                <div className="font-semibold text-gray-900 mb-1">Recommended Health Center</div>
+                <div className="text-sm text-gray-800">{assessment.facility_assignment.assigned_facility.name}</div>
+                {assessment.facility_assignment.assigned_facility.address && (
+                  <div className="text-xs text-gray-600 mt-1">Address: {assessment.facility_assignment.assigned_facility.address}</div>
+                )}
+                {assessment.facility_assignment.assigned_facility.district && (
+                  <div className="text-xs text-gray-600">District: {assessment.facility_assignment.assigned_facility.district}</div>
+                )}
+                {assessment.facility_assignment.assigned_facility.phone_number && (
+                  <div className="text-xs text-gray-600">Phone: {assessment.facility_assignment.assigned_facility.phone_number}</div>
+                )}
+                {assessment.facility_assignment.assigned_facility.latitude != null && assessment.facility_assignment.assigned_facility.longitude != null && (
+                  <a href={`https://www.google.com/maps?q=${assessment.facility_assignment.assigned_facility.latitude},${assessment.facility_assignment.assigned_facility.longitude}`} target="_blank" rel="noopener noreferrer" className="inline-block mt-2 text-xs text-primary-600 hover:underline">
+                    View on Google Maps
+                  </a>
+                )}
+                {assessment.facility_assignment.assigned_facility.available_medications?.length > 0 && (
+                  <div className="text-xs text-gray-600 mt-1">Medications: {assessment.facility_assignment.assigned_facility.available_medications.join(', ')}</div>
+                )}
+                {assessment.facility_assignment.distance_km != null && (
+                  <div className="text-xs text-gray-600 mt-1">Distance: {assessment.facility_assignment.distance_km} km</div>
+                )}
+              </div>
+            )}
             <div className="mt-2 text-xs text-gray-500 italic">{assessment.disclaimer}</div>
           </div>
         </div>

@@ -97,14 +97,14 @@ class TriageOrchestrator:
                     patient_token=patient_token,
                     defaults=defaults
                 )
-                print(f"🆕 Created new session for conversation")
+                print(f"Created new session for conversation")
         else:
             # Traditional mode - get or create
             session, created = TriageSession.objects.get_or_create(
                 patient_token=patient_token,
                 defaults=defaults
             )
-            print(f"{'🆕 Created new session' if created else '[MEMO] Using existing session'}")
+            print(f"{'Created new session' if created else 'Using existing session'}")
 
         # ====================================================================
         # STEP 2: Update session with all provided data
@@ -466,9 +466,9 @@ class TriageOrchestrator:
                 decision=final_decision,
                 red_flag_result=red_flag_result,
             )
-            print(f"🏥 FACILITY DISPATCH - success={bridge_result.get('success')} "
-                  f"facility={bridge_result.get('assigned_facility')} "
-                  f"booking={bridge_result.get('booking_type')}")
+            print("FACILITY DISPATCH - success=" + str(bridge_result.get("success")) +
+                  " facility=" + str(bridge_result.get("assigned_facility", {}).get("name") if isinstance(bridge_result.get("assigned_facility"), dict) else bridge_result.get("assigned_facility")) +
+                  " booking=" + str(bridge_result.get("booking_type")))
             # Attach bridge result so callers (messaging layer) can use the message
             final_decision['facility_assignment'] = bridge_result
             # Mark session as forwarded if dispatch succeeded

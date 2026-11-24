@@ -360,8 +360,10 @@ class ClinicalSafetyEngine:
                 f"to {final_risk} due to emergency indicators."
             )
         elif ml_risk_level:
-            reasoning_parts.append(f"ML prediction: {ml_risk_level} (confidence: {ml_confidence:.1%}" 
-                                   f"" if ml_confidence else "") + ")"
+            if ml_confidence:
+                reasoning_parts.append(f"ML prediction: {ml_risk_level} (confidence: {ml_confidence:.1%})")
+            else:
+                reasoning_parts.append(f"ML prediction: {ml_risk_level}")
         
         if not triggered_rules and not ml_risk_level:
             reasoning_parts.append("No safety concerns identified.")

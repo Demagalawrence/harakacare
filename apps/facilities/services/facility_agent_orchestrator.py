@@ -601,6 +601,12 @@ class FacilityAgentOrchestrator:
                 'phone_number': facility.phone_number,
                 'available_beds': facility.available_beds,
                 'total_beds': facility.total_beds,
+                'latitude': facility.latitude,
+                'longitude': facility.longitude,
+                'services_offered': facility.services_offered or [],
+                'available_medications': facility.available_medications or [],
+                'ambulance_available': facility.ambulance_available,
+                'average_wait_time_minutes': facility.average_wait_time_minutes,
             }
         
         # Handle alternative facilities (list of dicts with Facility objects)
@@ -619,6 +625,10 @@ class FacilityAgentOrchestrator:
                         'phone_number': facility.phone_number,
                         'available_beds': facility.available_beds,
                         'total_beds': facility.total_beds,
+                        'latitude': facility.latitude,
+                        'longitude': facility.longitude,
+                        'services_offered': facility.services_offered or [],
+                        'available_medications': facility.available_medications or [],
                     }
                     serialized_alternatives.append(alt_serialized)
                 else:
